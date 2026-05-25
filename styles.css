@@ -1,0 +1,1478 @@
+/* ==========================================================================
+   ── 0. PANTALLA DE CARGA (PRELOADER CINEMATOGRÁFICO)
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+body.cargando {
+    overflow: hidden !important;
+}
+
+#pantalla-carga {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh; /* Altura dinámica para navegadores móviles */
+    z-index: 99999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #09120c;
+    transition: opacity 1s cubic-bezier(0.85, 0, 0.15, 1), visibility 1s cubic-bezier(0.85, 0, 0.15, 1);
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Fix absoluto de estiramiento: escala el video sin perder relación de aspecto */
+#pantalla-carga video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    min-width: 100vw;
+    min-height: 100vh;
+    min-width: 100dvw;
+    min-height: 100dvh;
+    width: auto;
+    height: auto;
+    transform: translate(-50%, -50%);
+    object-fit: cover;
+    object-position: center;
+    z-index: 1;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Filtro de contraste refinado: deja apreciar al jaguar perfectamente con excelente nitidez */
+#pantalla-carga .capa-oscura {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    background: radial-gradient(circle at center, rgba(9, 18, 12, 0.15) 0%, rgba(9, 18, 12, 0.75) 100%);
+    backdrop-filter: brightness(0.9) contrast(1.05);
+}
+
+/* Contenedor de contenido - flotante y limpio en PC (sin card para no tapar al jaguar), y en móvil se adapta */
+#pantalla-carga .contenido-carga {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    max-width: 90%;
+    width: auto;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUpPreloader 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+}
+
+/* Tipografía original Playfair Display: elegante y unificada */
+#pantalla-carga h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    font-weight: 400;
+    color: #ffffff;
+    letter-spacing: 0.05em;
+    margin-bottom: 2rem;
+    line-height: 1.2;
+    text-transform: none;
+    text-shadow: 0 4px 25px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(30px);
+    animation: fadeUpPreloader 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+}
+
+#pantalla-carga h1 .resaltado-amazonico {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-weight: 600;
+    color: #a3e635; /* Verde selva vivo/lima */
+    text-shadow: 0 0 20px rgba(163, 230, 53, 0.45), 0 4px 10px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(120deg, #a3e635, #84cc16);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+    text-transform: none;
+    letter-spacing: normal;
+    margin-top: 0;
+}
+
+#pantalla-carga .linea-progreso {
+    position: relative;
+    width: 120px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    animation: fadeInPreloaderLine 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+}
+
+#pantalla-carga .linea-progreso::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #a3e635, #d9f99d, #a3e635);
+    box-shadow: 0 0 10px rgba(163, 230, 53, 0.8);
+    animation: progressFill 3.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+#pantalla-carga.ocultar {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Adaptación exquisita para PC y Móviles */
+@media (max-width: 600px) {
+    /* En móviles, añadimos la tarjeta contenedora de cristal (glassmorphism) que protege la legibilidad y se ve increíble */
+    #pantalla-carga .contenido-carga {
+        padding: 2.5rem 2rem;
+        width: 90%;
+        background: rgba(9, 18, 12, 0.45);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-top: 1px solid rgba(163, 230, 53, 0.35);
+        border-radius: 20px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    #pantalla-carga h1 {
+        font-size: 1.8rem;
+        line-height: 1.3;
+        margin-bottom: 1.5rem;
+    }
+
+    #pantalla-carga h1 .resaltado-amazonico {
+        display: inline-block;
+        margin-top: 0.2rem;
+    }
+
+    #pantalla-carga .linea-progreso {
+        width: 90px;
+    }
+}
+
+/* Animaciones cinematográficas */
+@keyframes scaleInCard {
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes fadeUpPreloader {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInPreloaderLine {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes progressFill {
+    0% {
+        width: 0%;
+    }
+    100% {
+        width: 100%;
+    }
+}
+
+/* ==========================================================================
+   ── 1. RESET & VARIABLES GLOBALES
+   ========================================================================== */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    /* Paleta Orgánica Refinada */
+    --fondo-oscuro: #09120c;
+    --verde-premium: #0f2d1e;
+    --verde-hoja: #1e5238;
+    --dorado-mate: #c5a453;
+    --dorado-brillante: #f3d487;
+    --crema-limpio: #fcfbfa;
+    --gris-cemento: #eae8e1;
+
+    /* Tipografía y Textos */
+    --texto-principal: #162219;
+    --texto-secundario: #556257;
+    --fuente-serif: 'Playfair Display', serif;
+    --fuente-sans: 'Barlow', sans-serif;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--fuente-sans);
+    background: var(--crema-limpio);
+    color: var(--texto-principal);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   ── 2. BARRA DE NAVEGACIÓN (ESTILO MINIMALISTA)
+   ========================================================================== */
+nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4rem;
+    height: 90px;
+    background: linear-gradient(to bottom, rgba(9, 18, 12, 0.85) 0%, rgba(9, 18, 12, 0.4) 60%, transparent 100%);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    transition: all 0.3s ease;
+}
+
+.nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    text-decoration: none;
+}
+
+.nav-escudo-img {
+    height: 54px;
+    width: auto;
+    object-fit: contain;
+    border-radius: 6px;
+    transition: transform 0.3s ease;
+}
+
+.nav-logo:hover .nav-escudo-img {
+    transform: scale(1.05);
+}
+
+.nav-titulo {
+    display: flex;
+    flex-direction: column;
+}
+
+.nav-titulo span:first-child {
+    font-family: var(--fuente-serif);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--dorado-brillante);
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+}
+
+.nav-titulo span:last-child {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2.8rem;
+    list-style: none;
+}
+
+.nav-links a {
+    text-decoration: none;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    position: relative;
+    transition: color 0.3s ease;
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: var(--dorado-mate);
+    transition: width 0.3s ease;
+}
+
+.nav-links a:hover {
+    color: #fff;
+}
+
+.nav-links a:hover::after {
+    width: 100%;
+}
+
+.nav-tiempo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: var(--fuente-sans);
+    text-align: right;
+    pointer-events: none;
+    user-select: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    padding-left: 20px;
+    height: 40px;
+}
+
+#tiempo-fecha {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dorado-mate);
+    margin-bottom: 2px;
+    font-weight: 500;
+}
+
+#tiempo-hora {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.05em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   ── 3. HERO (PORTADA CINEMATOGRÁFICA)
+   ========================================================================== */
+.hero {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--fondo-oscuro);
+}
+
+.hero video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    user-select: none;
+}
+
+.hero-blocker {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    cursor: default;
+}
+
+.hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom,
+            rgba(9, 18, 12, 0.6) 0%,
+            rgba(0, 0, 0, 0.1) 50%,
+            rgba(9, 18, 12, 0.85) 100%);
+    z-index: 3;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 4;
+    text-align: center;
+    padding: 2rem;
+    max-width: 850px;
+}
+
+.hero-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dorado-brillante);
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+}
+
+.hero-title {
+    font-family: var(--fuente-serif);
+    font-size: clamp(2.8rem, 6vw, 4.8rem);
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 0.8rem;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.hero-subtitle {
+    font-family: var(--fuente-serif);
+    font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+    color: var(--dorado-brillante);
+    font-style: italic;
+    font-weight: 400;
+    margin-bottom: 2.2rem;
+}
+
+.hero-desc {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 300;
+    line-height: 1.7;
+    max-width: 600px;
+    margin: 0 auto 2.8rem;
+}
+
+.hero-btn {
+    display: inline-block;
+    padding: 1rem 2.6rem;
+    background: transparent;
+    color: #fff;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 1px solid var(--dorado-mate);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.hero-btn:hover {
+    background: var(--dorado-mate);
+    color: var(--fondo-oscuro);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px rgba(197, 164, 83, 0.2);
+}
+
+.hero-scroll {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    animation: bounce 2s infinite;
+}
+
+.hero-scroll::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 45px;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateX(-50%) translateY(0);
+    }
+
+    50% {
+        transform: translateX(-50%) translateY(8px);
+    }
+}
+
+/* ==========================================================================
+   ── 4. SECCIÓN: BIENVENIDA & IDENTIDAD
+   ========================================================================== */
+.seccion-bienvenida {
+    padding: 80px 0;
+    background: #fafaf8;
+}
+
+.seccion-bienvenida .contenedor {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 30px;
+}
+
+/* Grid de dos columnas: texto a la izquierda, stats a la derecha */
+.historia-grid {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 50px;
+}
+
+/* COLUMNA IZQUIERDA: Contenido de texto */
+.bienvenida-content {
+    flex: 0 0 55%;
+}
+
+.bienvenida-content .eyebrow {
+    font-family: var(--fuente-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--verde-hoja);
+    margin-bottom: 20px;
+}
+
+.bienvenida-content h2 {
+    font-family: var(--fuente-serif);
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #1a1a1a;
+    margin-bottom: 8px;
+}
+
+.bienvenida-content h2 span {
+    display: block;
+    font-style: italic;
+    color: var(--verde-hoja);
+    margin-top: 5px;
+}
+
+.bienvenida-content .linea-dorada {
+    width: 50px;
+    height: 3px;
+    background: linear-gradient(to right, #c9a876, #8b7355);
+    margin: 25px 0 30px 0;
+}
+
+.bienvenida-content p {
+    font-family: var(--fuente-sans);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4a4a4a;
+    margin-bottom: 18px;
+    text-align: justify;
+}
+
+.bienvenida-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* COLUMNA DERECHA: Grid de tarjetas 2x2 */
+.bienvenida-stats {
+    flex: 0 0 40%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.stat-card {
+    background: #ffffff;
+    border-top: 3px solid #c9a876;
+    padding: 25px 20px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.stat-numero {
+    font-family: var(--fuente-serif);
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--verde-hoja);
+    margin-bottom: 8px;
+    line-height: 1;
+}
+
+.stat-label {
+    font-family: var(--fuente-sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #7a7a7a;
+    line-height: 1.4;
+}
+
+/* ==========================================================================
+   ── 5. SECCIÓN: POTENCIAL
+   ========================================================================== */
+.seccion-servicios {
+    background: #fff;
+    padding: 8rem 4rem;
+    border-top: 1px solid var(--gris-cemento);
+    border-bottom: 1px solid var(--gris-cemento);
+}
+
+.seccion-servicios .contenedor {
+    max-width: 1250px;
+    margin: 0 auto;
+}
+
+.seccion-header {
+    text-align: center;
+    margin-bottom: 4.5rem;
+}
+
+.seccion-header .eyebrow {
+    color: var(--dorado-mate);
+}
+
+.seccion-header h2 {
+    font-family: var(--fuente-serif);
+    font-size: clamp(2rem, 3.5vw, 2.8rem);
+    color: var(--fondo-oscuro);
+}
+
+.servicios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 2rem;
+}
+
+.servicio-card {
+    background: var(--crema-limpio);
+    border: 1px solid var(--gris-cemento);
+    padding: 2.5rem 2rem;
+    transition: all 0.3s ease;
+    cursor: default;
+}
+
+.servicio-card:hover {
+    background: #fff;
+    border-color: var(--dorado-mate);
+    transform: translateY(-5px);
+    box-shadow: 0 12px 32px rgba(9, 18, 12, 0.05);
+}
+
+.servicio-icono {
+    font-size: 2.2rem;
+    margin-bottom: 1.2rem;
+}
+
+.servicio-card h3 {
+    font-family: var(--fuente-serif);
+    font-size: 1.3rem;
+    color: var(--fondo-oscuro);
+    margin-bottom: 0.8rem;
+}
+
+.servicio-card p {
+    font-size: 14.5px;
+    color: var(--texto-secundario);
+    line-height: 1.7;
+}
+
+/* ==========================================================================
+   ── 6. SECCIÓN: NOTICIAS
+   ========================================================================== */
+.seccion-noticias {
+    padding: 8rem 4rem;
+    max-width: 1250px;
+    margin: 0 auto;
+}
+
+.noticias-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2.5rem;
+    margin-top: 4rem;
+}
+
+.noticia-card {
+    background: #fff;
+    border: 1px solid var(--gris-cemento);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.noticia-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 16px 40px rgba(9, 18, 12, 0.06);
+}
+
+.noticia-img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: var(--gris-cemento);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.5rem;
+}
+
+.noticia-body {
+    padding: 1.8rem;
+}
+
+.noticia-fecha {
+    font-size: 11px;
+    color: var(--verde-hoja);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+}
+
+.noticia-body h3 {
+    font-family: var(--fuente-serif);
+    font-size: 1.2rem;
+    color: var(--fondo-oscuro);
+    line-height: 1.4;
+    margin-bottom: 0.8rem;
+}
+
+.noticia-body p {
+    font-size: 14px;
+    color: var(--texto-secundario);
+    line-height: 1.7;
+}
+
+/* ==========================================================================
+   ── 7. FOOTER
+   ========================================================================== */
+footer {
+    background: var(--fondo-oscuro);
+    color: rgba(255, 255, 255, 0.65);
+    padding: 6rem 4rem 3rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 4rem;
+    max-width: 1250px;
+    margin: 0 auto 4rem;
+}
+
+.footer-logo h3 {
+    font-family: var(--fuente-serif);
+    font-size: 1.4rem;
+    color: var(--dorado-brillante);
+    margin-bottom: 1rem;
+}
+
+.footer-logo p {
+    font-size: 14px;
+    line-height: 1.8;
+    max-width: 360px;
+}
+
+.footer-col h4 {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dorado-mate);
+    margin-bottom: 1.4rem;
+    font-weight: 600;
+}
+
+.footer-col ul {
+    list-style: none;
+}
+
+.footer-col ul li {
+    margin-bottom: 0.8rem;
+}
+
+.footer-col ul li a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13.5px;
+    transition: color 0.2s ease;
+}
+
+.footer-col ul li a:hover {
+    color: var(--dorado-brillante);
+}
+
+.footer-bottom {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 2rem;
+    text-align: center;
+    font-size: 12px;
+    max-width: 1250px;
+    margin: 0 auto;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 0.05em;
+}
+
+/* ==========================================================================
+   ── 8. RESPONSIVE
+   ========================================================================== */
+@media (max-width: 992px) {
+    .historia-grid {
+        flex-direction: column;
+        gap: 40px;
+    }
+
+    .bienvenida-content,
+    .bienvenida-stats {
+        flex: 0 0 100%;
+    }
+
+    .bienvenida-content h2 {
+        font-size: 2rem;
+    }
+
+    .bienvenida-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .stat-numero {
+        font-size: 1.8rem;
+    }
+
+    .footer-grid {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+    }
+}
+
+@media (max-width: 768px) {
+    nav {
+        padding: 0 2rem;
+        height: 80px;
+    }
+
+    .nav-links {
+        display: none;
+    }
+
+    .nav-tiempo {
+        padding-left: 12px;
+        height: 35px;
+    }
+
+    #tiempo-fecha {
+        font-size: 8px;
+        letter-spacing: 0.05em;
+    }
+
+    #tiempo-hora {
+        font-size: 11px;
+    }
+
+    @media (max-width: 480px) {
+        #tiempo-fecha {
+            display: none;
+        }
+        .nav-tiempo {
+            border-left: none;
+            padding-left: 0;
+            height: auto;
+        }
+        #tiempo-hora {
+            font-size: 12px;
+            font-weight: 600;
+        }
+    }
+
+    .nav-escudo-img {
+        height: 44px;
+    }
+
+    .seccion-bienvenida {
+        padding: 5rem 2rem;
+    }
+
+    .seccion-bienvenida .contenedor {
+        padding: 0 15px;
+    }
+
+    .historia-grid {
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    .bienvenida-content {
+        flex: 0 0 100%;
+    }
+
+    .bienvenida-content h2 {
+        font-size: 1.8rem;
+    }
+
+    .bienvenida-stats {
+        flex: 0 0 100%;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .stat-numero {
+        font-size: 1.6rem;
+    }
+
+    .stat-card {
+        padding: 20px 15px;
+    }
+
+    .seccion-servicios {
+        padding: 5rem 2rem;
+    }
+
+    .seccion-noticias {
+        padding: 5rem 2rem;
+    }
+}
+
+/* ==========================================================================
+   ── 9. CHATBOT WIDGET (GLASSMORPHIC PREMIUM DESIGN)
+   ========================================================================== */
+
+/* Botón flotante contenedor */
+#chatbot-toggle {
+    position: relative;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--verde-hoja), var(--dorado-mate));
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(197, 164, 83, 0.25);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: breathingGlow 3s infinite ease-in-out;
+    flex-shrink: 0;
+}
+
+@keyframes breathingGlow {
+    0% {
+        box-shadow: 0 8px 32px rgba(197, 164, 83, 0.25);
+    }
+    50% {
+        box-shadow: 0 8px 40px rgba(197, 164, 83, 0.55), 0 0 15px rgba(197, 164, 83, 0.3);
+    }
+    100% {
+        box-shadow: 0 8px 32px rgba(197, 164, 83, 0.25);
+    }
+}
+
+#chatbot-toggle:hover {
+    transform: scale(1.08) rotate(-5deg);
+    box-shadow: 0 12px 40px rgba(197, 164, 83, 0.55);
+}
+
+
+/* Video de libélula dentro del botón flotante */
+#libelulin-video-toggle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    pointer-events: none;
+    object-fit: cover;
+}
+
+/* Contenedor del chatbot con saludo */
+/* Contenedor del chatbot con saludo */
+.chatbot-contenedor {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+/* Nube de pensamiento profesional */
+.chatbot-saludo {
+    background: rgba(9, 18, 12, 0.92);
+    border: 1px solid rgba(197, 164, 83, 0.35);
+    border-radius: 24px;
+    padding: 14px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dorado-brillante);
+    white-space: nowrap;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    animation: saludoFlotante 3s ease-in-out infinite;
+    pointer-events: none;
+    position: relative;
+    margin-bottom: 20px;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ocultar saludo cuando chat abierto */
+.chatbot-contenedor.chat-abierto .chatbot-saludo {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transform: translateY(-12px) scale(0.95) !important;
+}
+
+/* Puntitos de pensamiento grandes */
+.chatbot-saludo::before {
+    content: '';
+    position: absolute;
+    bottom: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: rgba(197, 164, 83, 0.6);
+    border-radius: 50%;
+    box-shadow: 
+        -20px -8px 0 -6px rgba(197, 164, 83, 0.4),
+        8px -16px 0 -8px rgba(197, 164, 83, 0.3);
+}
+
+/* Cola de pensamiento redondeada */
+.chatbot-saludo::after {
+    content: '';
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    background: rgba(9, 18, 12, 0.92);
+    border: 1px solid rgba(197, 164, 83, 0.35);
+    border-radius: 50%;
+}
+
+@keyframes saludoFlotante {
+    0%, 100% {
+        opacity: 0.85;
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(-10px) scale(1.02);
+    }
+}
+
+/* Ventana del chat */
+#chatbot-window {
+    position: fixed;
+    bottom: 7rem;
+    right: 2rem;
+    z-index: 998;
+    width: 370px;
+    height: 500px;
+    max-height: 540px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    background: rgba(9, 18, 12, 0.85); /* Cristal oscuro */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(197, 164, 83, 0.2); /* Borde sutil dorado */
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px) scale(0.95);
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#chatbot-window.abierto {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0) scale(1);
+}
+
+/* Cabecera del chat */
+.chat-header {
+    background: linear-gradient(135deg, var(--verde-premium), var(--fondo-oscuro));
+    padding: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(197, 164, 83, 0.3); /* Borde dorado */
+}
+
+/* Tabs dentro del chat */
+.chat-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px;
+    justify-content: center;
+}
+.chat-tab {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.06);
+    color: var(--crema-limpio);
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.chat-tab.active {
+    background: linear-gradient(90deg, rgba(197,164,83,0.12), rgba(197,164,83,0.06));
+    border-color: rgba(197,164,83,0.35);
+    color: var(--dorado-brillante);
+}
+
+/* Mostrar/ocultar sets de opciones según modo */
+.chat-opciones--alcaldia { display: none; padding: 0 12px 12px 12px; }
+.chat-opciones--educacion { display: none; padding: 0 12px 12px 12px; }
+.chat-opciones--visible { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Cuando el modo alcaldia está activo ocultamos el input */
+.chat-input-area.chat-mode-disabled { display: none; }
+
+/* Mejor separación entre opciones y mensajes */
+#chat-mensajes { padding-bottom: 6px; }
+
+/* Contenedor del icono GIF en la cabecera */
+.chat-header-icon {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+
+/* Video de libélula dentro de la cabecera */
+#libelulin-video {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px solid var(--dorado-mate);
+    box-shadow: 0 0 8px rgba(197, 164, 83, 0.5);
+    animation: pulseGold 2s infinite ease-in-out;
+    object-fit: cover;
+}
+
+@keyframes pulseGold {
+    0% {
+        box-shadow: 0 0 0 0 rgba(197, 164, 83, 0.6);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(197, 164, 83, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(197, 164, 83, 0);
+    }
+}
+
+.chat-header-text h4 {
+    font-family: var(--fuente-serif);
+    color: var(--dorado-brillante);
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.chat-header-text span {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    display: block;
+}
+
+/* Área de mensajes */
+#chat-mensajes {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    background: rgba(9, 18, 12, 0.45); /* Fondo oscuro translúcido */
+}
+
+/* Scrollbar personalizado para los mensajes */
+#chat-mensajes::-webkit-scrollbar {
+    width: 6px;
+}
+
+#chat-mensajes::-webkit-scrollbar-track {
+    background: rgba(9, 18, 12, 0.2);
+}
+
+#chat-mensajes::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, var(--verde-hoja), var(--dorado-mate));
+    border-radius: 3px;
+}
+
+/* Burbujas de chat */
+.msg {
+    max-width: 85%;
+    padding: 0.8rem 1.1rem;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    word-break: break-word;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    animation: fadeInBubble 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.msg-bot {
+    background: rgba(255, 255, 255, 0.06); /* Tarjeta de cristal */
+    color: var(--crema-limpio);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.msg-user {
+    background: linear-gradient(135deg, var(--verde-hoja), var(--verde-premium));
+    color: #fff;
+    border: 1px solid rgba(197, 164, 83, 0.15); /* Borde dorado ultrafino */
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 4px 15px rgba(30, 82, 56, 0.25);
+}
+
+/* Animación de "Escribiendo..." */
+.msg-typing {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    padding: 0.8rem 1.1rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.msg-typing span {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dorado-brillante);
+    animation: typing-dot 1.2s infinite ease-in-out;
+}
+
+.msg-typing span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.msg-typing span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing-dot {
+    0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+    }
+    40% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+/* Texto dentro de la burbuja del bot (efecto de escritura) */
+.bot-text {
+    white-space: pre-wrap;
+    display: inline-block;
+}
+
+@keyframes fadeInBubble {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Área de Input de texto */
+.chat-input-area {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.7rem 0.5rem 1.3rem;
+    margin: 0 1.2rem 1.2rem 1.2rem;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.chat-input-area:focus-within {
+    border-color: var(--dorado-mate);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 30px rgba(197, 164, 83, 0.15);
+}
+
+#chat-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.5rem 0;
+    font-family: var(--fuente-sans);
+    font-size: 13.5px;
+    color: #fff;
+    outline: none;
+    resize: none;
+    transition: none;
+}
+
+#chat-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#chat-input:disabled {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+}
+
+#chat-enviar {
+    background: linear-gradient(135deg, var(--dorado-mate), var(--dorado-brillante));
+    color: var(--fondo-oscuro);
+    border: none;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    padding: 0 0 0 2px; /* Alineación de flecha ➤ */
+    box-shadow: 0 4px 10px rgba(197, 164, 83, 0.25);
+}
+
+#chat-enviar:hover:not(:disabled) {
+    background: #fff;
+    transform: scale(1.08);
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4);
+}
+
+#chat-enviar:disabled {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Opciones de pregunta rápida */
+.chat-opciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    animation: fadeInBubble 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.chat-opcion {
+    background: rgba(197, 164, 83, 0.08);
+    color: var(--dorado-brillante);
+    border: 1px solid rgba(197, 164, 83, 0.25);
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 12.5px;
+    font-family: var(--fuente-sans);
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    text-align: left;
+}
+
+.chat-opcion:hover {
+    background: rgba(197, 164, 83, 0.18);
+    border-color: var(--dorado-brillante);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 14px rgba(197, 164, 83, 0.18);
+}
+
+/* Estilos para renderizado de Markdown dentro del bot */
+.msg-bot p {
+    margin-bottom: 0.6rem;
+}
+.msg-bot p:last-child {
+    margin-bottom: 0;
+}
+.msg-bot ul, .msg-bot ol {
+    margin-left: 1.3rem;
+    margin-bottom: 0.6rem;
+}
+.msg-bot li {
+    margin-bottom: 0.35rem;
+}
+.msg-bot strong {
+    font-weight: 600;
+    color: var(--dorado-brillante);
+}
+.msg-bot a {
+    color: var(--dorado-brillante);
+    text-decoration: underline;
+    transition: color 0.2s ease;
+}
+.msg-bot a:hover {
+    color: #fff;
+}
+
+@media (max-width: 420px) {
+    #chatbot-window {
+        width: calc(100vw - 2rem);
+        right: 1rem;
+        height: 68vh;
+    }
+}
+
+/* ==========================================================================
+   ── 10. EFECTO DE CURSOR LUMINOSO
+   ========================================================================== */
+.cursor-glow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(197, 164, 83, 0.15) 0%, rgba(30, 82, 56, 0.05) 40%, rgba(9, 18, 12, 0) 70%);
+    border-radius: 50%;
+    pointer-events: none; /* Muy importante para no bloquear clics */
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    mix-blend-mode: screen;
+    transition: width 0.3s, height 0.3s;
+    opacity: 0;
+}
+
+/* Ocultar en dispositivos táctiles */
+@media (hover: none) {
+    .cursor-glow {
+        display: none;
+    }
+}
