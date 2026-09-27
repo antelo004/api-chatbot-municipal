@@ -107,41 +107,54 @@ def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
     else:
         instruccion_idioma = f"CRITICAL INSTRUCTION: You MUST answer the user in {idioma_nombre} language. All your responses must be strictly translated to {idioma_nombre}. However, keep a warm and friendly tone."
     
-    # PASO B: Si es una duda abierta o en otro idioma, usar LLM en Groq
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # El modelo gratuito más potente y rápido de Groq
-            temperature=0.4,         # Creatividad media para poder conversar libremente
-            messages=[
-                {
-                    "role": "system", 
-                    "content": (
-                        "Eres Libélulin, el asistente virtual oficial, amigable y carismático de la web del Gobierno de Riberalta. "
-                        f"Hoy es {fecha_actual}. "
-                        f"{instruccion_idioma} "
-                        "Si el ciudadano te pregunta sobre el motivo de la creación de la web o datos de la alcaldía, básate en esto:\n"
-                        f"{CONTEXTO_WEB}\n"
-                        "Eres una Inteligencia Artificial avanzada, así que SI PUEDES responder cualquier otra pregunta general, "
-                        "ayudar con matemáticas, programación, historia, o cualquier tema que el usuario te consulte, como si fueras ChatGPT. "
-                        "Nunca digas que no puedes responder algo solo por no ser de la alcaldía. Simplemente ayuda al usuario en lo que necesite siempre con actitud servicial."
-                    )
-                },
-                {"role": "user", "content": mensaje_usuario}
-            ]
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
+    # PASO B: Si es una duda abierta o educativa, usar LLM en Groq con lista de modelos activos
+    MODELOS = [
+        "qwen/qwen3.8-27b",
+        "openai/gpt-oss-20b",
+        "llama-3.1-8b-instant"
+    ]
+
+    ultimo_error = None
+    for modelo in MODELOS:
+        try:
+            response = client.chat.completions.create(
+                model=modelo,
+                temperature=0.4,
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": (
+                            "Eres Libélulin, el asistente virtual oficial, amigable y carismático de la web del Gobierno de Riberalta. "
+                            f"Hoy es {fecha_actual}. "
+                            f"{instruccion_idioma} "
+                            "Si el ciudadano te pregunta sobre el motivo de la creación de la web o datos de la alcaldía, básate en esto:\n"
+                            f"{CONTEXTO_WEB}\n"
+                            "Eres un tutor educativo y una Inteligencia Artificial avanzada: SI PUEDES responder cualquier pregunta general, "
+                            "ayudar a escolares, universitarios y ciudadanos con tareas, matemáticas, ciencias, biología, programación, historia, "
+                            "redacción o cualquier tema académico o educativo que te consulten, como si fueras ChatGPT con sabiduría amazónica. "
+                            "Nunca digas que no puedes responder algo solo por no ser de la alcaldía. Simplemente ayuda con entusiasmo, claridad y actitud servicial."
+                        )
+                    },
+                    {"role": "user", "content": mensaje_usuario}
+                ]
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            ultimo_error = e
+            continue
+
+    # Si todos los modelos fallan, registrar el error y dar respuesta de respaldo
+    if ultimo_error:
         import traceback
         with open("error.log", "w", encoding="utf-8") as f:
             f.write(traceback.format_exc())
-        
-        # Si la API falla, responder en el idioma solicitado si es posible (fallback básico)
-        if idioma == 'en': return "Sorry, I am having trouble connecting to the server. Please try again later."
-        elif idioma == 'fr': return "Désolé, j'ai des problèmes de connexion avec le serveur. Veuillez réessayer plus tard."
-        return (
-            "Lo siento, en este momento tengo problemas para conectar con el servidor central. "
-            "Por favor, intenta de nuevo en unos instantes o contáctanos en nuestras oficinas."
-        )
+    
+    if idioma == 'en': return "Sorry, I am having trouble connecting to the server. Please try again later."
+    elif idioma == 'fr': return "Désolé, j'ai des problèmes de connexion avec le serveur. Veuillez réessayer plus tard."
+    return (
+        "Lo siento, en este momento tengo problemas para conectar con el servidor central. "
+        "Por favor, intenta de nuevo en unos instantes o contáctanos en nuestras oficinas."
+    )
 
 # ══════════════════════════════════════════════════════════════
 # ENDPOINTS DE LA API FLASK
