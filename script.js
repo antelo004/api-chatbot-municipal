@@ -1,15 +1,28 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Despertar silenciosamente la instancia de Render al cargar la página
+    try {
+        fetch("https://api-chatbot-municipal.onrender.com/", { mode: 'no-cors' }).catch(() => {});
+    } catch(e) {}
+
     const chatToggle = document.getElementById("chatbot-toggle");
     const chatWindow = document.getElementById("chatbot-window");
     const chatInput = document.getElementById("chat-input");
     const chatEnviar = document.getElementById("chat-enviar");
     const chatMensajes = document.getElementById("chat-mensajes");
+    const chatCerrar = document.getElementById("chat-cerrar");
 
-    // URL de tu servidor backend de IA (Ajusta el puerto si es necesario)
-    const API_URL = "http://127.0.0.1:5000/chat";
+    // Despertar también al pasar el mouse sobre el botón
+    if (chatToggle) {
+        chatToggle.addEventListener("mouseenter", () => {
+            try { fetch("https://api-chatbot-municipal.onrender.com/", { mode: 'no-cors' }).catch(() => {}); } catch(e) {}
+        }, { once: true });
+    }
 
-    // 1. Alternar apertura y cierre de la ventana
-    chatToggle.addEventListener("click", () => {
+    // URL del servidor backend en Render
+    const API_URL = "https://api-chatbot-municipal.onrender.com/chat";
+
+    // Función para abrir/cerrar el chat
+    function toggleChat() {
         const contenedor = document.querySelector(".chatbot-contenedor");
         chatWindow.classList.toggle("abierto");
         if (chatWindow.classList.contains("abierto")) {
@@ -17,6 +30,21 @@ document.addEventListener("DOMContentLoaded", () => {
             chatInput.focus();
         } else {
             contenedor.classList.remove("chat-abierto");
+        }
+    }
+
+    // 1. Toggle al hacer clic en la mascota
+    chatToggle.addEventListener("click", toggleChat);
+
+    // Botón cerrar (X) dentro del chat
+    if (chatCerrar) {
+        chatCerrar.addEventListener("click", toggleChat);
+    }
+
+    // Cerrar con Escape
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && chatWindow.classList.contains("abierto")) {
+            toggleChat();
         }
     });
 

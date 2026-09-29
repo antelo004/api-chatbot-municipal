@@ -10,11 +10,11 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=1790487287751">
+    <link rel="stylesheet" href="../login-widget.css?v=1790487287751">
 </head>
 
 <body class="cargando">
-    <!-- Pantalla de Carga (Preloader) Cinematográfica -->
     <div id="pantalla-carga">
         <video autoplay loop muted playsinline>
             <source src="jaguar2.mp4" type="video/mp4">
@@ -46,7 +46,6 @@
             <li><a href="#contacto">Contacto</a></li>
         </ul>
 
-        <!-- Reloj y fecha en tiempo real de Riberalta (Bolivia BOT) -->
         <div class="nav-tiempo" id="nav-tiempo" title="Hora oficial de Riberalta, Bolivia">
             <span id="tiempo-fecha">Cargando fecha...</span>
             <span id="tiempo-hora">00:00:00</span>
@@ -209,7 +208,7 @@
     </footer>
 
     <div class="chatbot-contenedor">
-        <div class="chatbot-saludo">¡Ey! 👋 ¿Necesitas ayuda?</div>
+        <div class="chatbot-saludo">¡Ey! 👋</div>
         <button id="chatbot-toggle" title="Abrir chat">
             <video id="libelulin-video-toggle" autoplay loop muted playsinline>
                 <source src="libelulin 12.mp4" type="video/mp4">
@@ -228,19 +227,18 @@
                 <h4>Guía Virtual Riberalta</h4>
                 <span>Línea de respuesta inmediata</span>
             </div>
+            <button id="chat-cerrar" title="Cerrar chat" aria-label="Cerrar chat">✕</button>
         </div>
         <div id="chat-mensajes">
             <div class="msg msg-bot">
                 ¡Hola pariente! 👋 Soy Libélulin, tu asistente virtual de Riberalta. ¿En qué te puedo colaborar hoy?
                 Puedes elegir una opción abajo o escribirme tu consulta.
             </div>
-            <!-- Pestañas para modos -->
             <div class="chat-tabs" id="chat-tabs">
                 <button class="chat-tab" data-mode="alcaldia">Alcaldía</button>
                 <button class="chat-tab" data-mode="educacion">Educación</button>
             </div>
 
-            <!-- Opciones para Alcaldía (predefinidas) -->
             <div class="chat-opciones chat-opciones--alcaldia" id="chat-opciones-alcaldia">
                 <button class="chat-opcion" data-key="horarios">Horarios de atención</button>
                 <button class="chat-opcion" data-key="ubicacion">Ubicación de la Alcaldía</button>
@@ -248,9 +246,7 @@
                 <button class="chat-opcion" data-key="tramites">Trámites habituales</button>
             </div>
 
-            <!-- Sugerencias para Educación (permite escribir) -->
             <div class="chat-opciones chat-opciones--educacion" id="chat-opciones-educacion">
-                <!-- Opciones eliminadas por solicitud del usuario -->
             </div>
         </div>
         <div class="chat-input-area">
@@ -259,7 +255,70 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=1790487287751"></script>
+
+    <!-- ═══ LOGIN MODAL (global) ═══ -->
+    <div class="login-modal-overlay" id="loginModal">
+        <div class="login-modal-content">
+            <button type="button" class="close-modal" id="closeLoginModal" onclick="document.getElementById('loginModal').classList.remove('open');">&#x2715;</button>
+            <div class="login-header">
+                <h3>Iniciar Sesión</h3>
+                <p>Accede a tu cuenta municipal</p>
+            </div>
+            <div class="form-container active" id="formLogin">
+                <form id="loginForm">
+                    <div class="input-group">
+                        <label>Correo Electrónico</label>
+                        <input type="email" id="loginEmail" required placeholder="tu@correo.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="loginPass" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn-orange-solid">Entrar</button>
+                    <p class="switch-form">¿No tienes cuenta? <a href="#" onclick="document.getElementById('formLogin').classList.remove('active');document.getElementById('formRegister').classList.add('active');return false;">Regístrate aquí</a></p>
+                </form>
+            </div>
+            <div class="form-container" id="formRegister">
+                <form id="registerForm">
+                    <div class="input-group">
+                        <label>Nombre</label>
+                        <input type="text" id="regName" required placeholder="Tu Nombre">
+                    </div>
+                    <div class="input-group">
+                        <label>Correo Electrónico</label>
+                        <input type="email" id="regEmail" required placeholder="tu@correo.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="regPass" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn-orange-solid">Crear Cuenta</button>
+                    <p class="switch-form">¿Ya tienes cuenta? <a href="#" onclick="document.getElementById('formRegister').classList.remove('active');document.getElementById('formLogin').classList.add('active');return false;">Inicia Sesión</a></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    
+    
+    
+    <!-- ═══ USER STATUS WIDGET ═══ -->
+    <div class="user-status-widget" id="userStatusWidget">
+        <div class="usw-tooltip" id="userStatusTooltip">
+            <div class="usw-tooltip-inner">
+                <div class="usw-tooltip-avatar"></div>
+                <div class="usw-tooltip-text">
+                    <span class="usw-tooltip-title" id="userStatusText" data-i18n="comer_no_sesion">Iniciar sesión</span>
+                    
+                </div>
+                <button class="usw-tooltip-btn" id="userStatusActionBtn" aria-label="Ir al login">&#8594;</button>
+            </div>
+        </div>
+        <button id="qhLogoutBtn" style="display:none;" data-i18n="comer_salir">Salir</button>
+    </div>
+    <script type="module" src="../auth-service.js?v=1790487287751"></script>
+    <script src="../animacion.js?v=1790487287751"></script>
 </body>
 
 </html>

@@ -1128,6 +1128,33 @@ footer {
     border-bottom: 1px solid rgba(197, 164, 83, 0.3); /* Borde dorado */
 }
 
+/* Botón cerrar (X) del chat */
+#chat-cerrar {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid rgba(197, 164, 83, 0.25);
+    color: rgba(255, 255, 255, 0.55);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    line-height: 1;
+    padding: 0;
+}
+
+#chat-cerrar:hover {
+    background: rgba(197, 164, 83, 0.15);
+    border-color: rgba(197, 164, 83, 0.5);
+    color: var(--dorado-brillante);
+    transform: rotate(90deg) scale(1.1);
+}
+
 /* Tabs dentro del chat */
 .chat-tabs {
     display: flex;
