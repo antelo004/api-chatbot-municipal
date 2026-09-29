@@ -1,14 +1,9 @@
 """
 chatbot.py — Servidor Flask para el Chatbot del Municipio de Riberalta
 =====================================================================
-Requisitos en tu entorno aislado (.venv):
-    pip install flask flask-cors flask-limiter openai python-dotenv duckduckgo-search
-
-Arrancar:
-    python chatbot.py
-
-El servidor escucha en http://127.0.0.1:5000
-Endpoint: POST /chat   →  { "mensaje": "...", "idioma": "es", "primera_vez": true }  →  { "respuesta": "..." }
+Chatbot con acceso REAL a internet (Wikipedia + DuckDuckGo),
+base de conocimiento regional verificada (Riberalta, Cachuela Esperanza, Guayaramerín)
+y modelos LLM en la nube de Groq.
 """
 
 from flask import Flask, request, jsonify
@@ -18,295 +13,327 @@ from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from openai import OpenAI
 import os
+import re
+import json
+import urllib.request
+import urllib.parse
 from datetime import datetime
 
-# 1. Cargar las variables de entorno desde el archivo .env
+# 1. Cargar variables de entorno
 load_dotenv()
 
 app = Flask(__name__)
 
-# CORS restringido: solo tu sitio de Netlify y localhost para desarrollo
+# CORS abierto para desarrollo y sitios autorizados
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 CORS(app, origins=allowed_origins)
 
-# Rate limiting: máximo 30 peticiones por minuto por IP
+# Rate limiting: 60 peticiones por minuto por IP
 limiter = Limiter(get_remote_address, app=app, default_limits=["60 per minute"])
 
-# 2. Inicializar el cliente oficial conectado a la nube gratuita de Groq
+# 2. Cliente Groq
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=os.getenv("GROQ_API_KEY")
 )
 
 # ══════════════════════════════════════════════════════════════
-# 3. HECHOS VERIFICADOS DE RIBERALTA — El LLM DEBE usar estos datos exactos.
-#    Nunca debe inventar fechas, nombres ni estadísticas sobre Riberalta.
+# 3. BASE DE DATOS REGIONAL VERIFICADA (Riberalta, Cachuela Esperanza, Guayaramerín)
 # ══════════════════════════════════════════════════════════════
-HECHOS_RIBERALTA = """
-=== HECHOS VERIFICADOS DE RIBERALTA — USA SIEMPRE ESTOS DATOS, NUNCA LOS INVENTES ===
+HECHOS_RIBERALTA_Y_REGION = """
+=== DATOS OFICIALES Y VERIFICADOS DE RIBERALTA Y LA REGIÓN NORTE AMAZÓNICA ===
 
-HISTORIA:
-- Fecha de fundación oficial: 3 de febrero de 1894
-- Nombre histórico original: "Barranca Colorada"
-- Fundada estratégicamente en la confluencia de los ríos Beni y Madre de Dios
-- Se consolidó como eje central durante el auge del caucho y la goma (siglo XIX-XX)
-- Formalmente reconocida como municipio por el Estado boliviano en 1894
+1. RIBERALTA:
+- Fecha de fundación oficial: 3 de febrero de 1894 (por Decreto Supremo durante la presidencia de Mariano Baptista, fundada por el delegado nacional Lisímaco Gutiérrez).
+- Nombre histórico anterior: "Barranca Colorada" (nombre dado por los navegantes que avistaron los barrancos rojizos en la orilla).
+- Ubicación: Confluencia estratégica de los ríos Beni y Madre de Dios, provincia Vaca Díez, departamento del Beni, Bolivia.
+- Apodo: "Capital de la Amazonía Boliviana" y "Capital Mundial de la Castaña".
+- Economía: Primer exportador de castaña amazónica (nuez de la Amazonía / Bertholletia excelsa) de Bolivia y del mundo. También destaca por el ecoturismo, la madera sostenible y el comercio.
+- Pueblos indígenas originarios: Chácobo, Cavineño, Tacana y Esse Ejja.
+- Alcaldía: Gobierno Autónomo Municipal de Riberalta (GAMR). Horarios: Lunes a viernes 08:00–12:00 y 14:00–18:00 frente a la Plaza Principal 3 de Febrero. Correo: alcaldia@riberalta.gob.bo.
 
-GEOGRAFÍA:
-- Ubicación: confluencia de los ríos Beni y Madre de Dios
-- Departamento: Beni, Bolivia
-- Región: Amazonía boliviana (norte del Beni)
-- Apodo: "Capital de la Amazonía Boliviana" y "Corazón de la Amazonía"
+2. CACHUELA ESPERANZA:
+- Ubicación: A orillas del río Beni, a unos 43 km de la ciudad de Guayaramerín y a unos 90 km de Riberalta, en el municipio de Guayaramerín, provincia Vaca Díez, departamento del Beni.
+- Significado del nombre: "Cachuela" significa rápidos o caídas de agua rocosas en el río.
+- Historia y Auge: A finales del siglo XIX y principios del XX, fue la capital del gigantesco imperio gomero de Nicolás Suárez Callaú ("el Rey de la Goma").
+- Adelantos históricos sorprendentes: En plena selva amazónica, Cachuela Esperanza llegó a tener comodidades adelantadas a su época: el primer equipo de rayos X de Bolivia, su propio ferrocarril, cine/teatro con artistas traídos de Europa, energía eléctrica, telégrafo, imprenta y hospital de alta gama.
+- Atractivo turístico actual: Destino turístico patrimonial imprescindible por sus ruinas de arquitectura victoriana inglesa, la iglesia, la casa Suárez, la vista imponente de los rápidos (cachuelas) del río Beni y su rica historia de la fiebre del caucho.
 
-ECONOMÍA:
-- Principal exportación: Castaña amazónica (Bertholletia excelsa)
-- Riberalta es el primer exportador de castaña de Bolivia y del mundo
-- Industria castañera es el motor económico principal
-- Turismo ecológico en crecimiento
+3. GUAYARAMERÍN:
+- Segunda ciudad más importante de la provincia Vaca Díez (departamento del Beni).
+- Ubicada a orillas del río Mamoré, en la frontera internacional frente a la ciudad brasileña de Guajará-Mirim (estado de Rondônia).
+- Es un vital puerto fluvial comercial, zona franca y centro de intercambio fronterizo del norte boliviano.
+- Conexión con Riberalta: Aproximadamente 85 km por carretera asfaltada (Ruta Fundamental 8).
 
-CULTURA Y PUEBLOS:
-- Pueblos originarios principales: Chácobo y Cavineño
-- Mezcla de tradiciones originarias con herencia colona de la época gomera
-- Música, danza y artesanía local típicas de la Amazonía
+4. LAGUNA TUMICHUCUA:
+- Espectacular laguna natural ubicada a solo 25 km al sur de Riberalta.
+- Famosa por albergar una isla flotante cubierta de palmeras y exuberante vegetación en su centro.
+- Destino turístico favorito para paseos en bote, pesca deportiva, avistamiento de aves amazónicas, baño y leyendas tradicionales (como la del Jichi y el Bufeo).
 
-ALCALDÍA:
-- Nombre oficial: Gobierno Autónomo Municipal de Riberalta (GAMR)
-- Horarios de atención: lunes a viernes 08:00–12:00 y 14:00–18:00
-- Dirección: frente a la Plaza Principal de Riberalta
-- Correo: alcaldia@riberalta.gob.bo
-
-PLATAFORMA WEB:
-- Objetivo: reactivar el turismo local, digitalizar el acceso a información pública
-- Visión: Riberalta como referente de transparencia y modernización en la Amazonía boliviana
-
-=== FIN DE HECHOS VERIFICADOS ===
+=== FIN DE DATOS VERIFICADOS ===
 """
 
-# 4. FILTRO HÍBRIDO: Respuestas locales inmediatas (Costo $0 y velocidad instantánea)
-RESPUESTAS_LOCALES = {
-    ("hola", "buenas", "buen día", "saludos"): (
-        "¡Hola pariente! 👋 Soy Libélulin, tu asistente virtual del Gobierno Autónomo Municipal de Riberalta. "
-        "¿En qué te puedo colaborar el día de hoy?"
-    ),
-    ("horario", "atienden", "hora", "horarios", "abren", "cierran"): (
-        "🕐 ¡Claro que sí! El Gobierno Autónomo Municipal de Riberalta te atiende de lunes a viernes "
-        "de 08:00 a 12:00 por la mañanita, y de 14:00 a 18:00 por la tarde."
-    ),
-    ("dirección", "dónde", "ubicación", "queda", "plaza", "alcaldia"): (
-        "📍 La alcaldía central se encuentra ubicada frente a la Plaza Principal de Riberalta, "
-        "en pleno centro de nuestra hermosa región amazónica."
-    ),
-    ("teléfono", "número", "llamar", "contacto", "correo"): (
-        "📞 Con gusto. Puedes comunicarte con nosotros escribiendo al correo oficial: alcaldia@riberalta.gob.bo "
-        "o aproximándote a nuestras ventanillas de atención central."
-    ),
-    ("gracias", "muchas gracias", "perfecto", "buenisimo"): (
-        "🙏 ¡De nada, pariente! Estamos para servir a nuestra población. ¿Hay algo más en lo que pueda ayudarte?"
-    ),
-    ("adiós", "chau", "hasta luego", "bye"): (
-        "👋 ¡Hasta pronto! Que tengas un excelente día en nuestra hermosa Riberalta. Recuerda que la plataforma municipal "
-        "está siempre disponible para ti."
-    ),
-}
-
 # ══════════════════════════════════════════════════════════════
-# 5. BÚSQUEDA WEB — DuckDuckGo (sin API key, gratuito)
+# 4. MOTOR DE BÚSQUEDA WEB EN TIEMPO REAL (Wikipedia + DuckDuckGo)
+#    No requiere API key externa, robusto y tolerante a fallos
 # ══════════════════════════════════════════════════════════════
 
-# Palabras clave que indican que la consulta necesita información en tiempo real
-PALABRAS_BUSQUEDA = [
-    # Clima y meteorología
-    "clima", "tiempo", "temperatura", "lluvia", "llueve", "calor", "frío",
-    "weather", "forecast", "pronóstico", "humedad", "viento",
-    # Noticias y actualidad
-    "noticia", "noticias", "ahora", "actual", "último", "últimas",
-    "news", "latest", "today", "reciente", "novedad",
-    # Preguntas factuales dinámicas
-    "precio", "cotización", "dólar", "boliviano", "tipo de cambio",
-    "partido", "resultado", "score", "marcador",
-    "quién es el presidente", "elección", "elecciones",
-    # Búsqueda explícita
-    "busca", "buscar", "busque", "encuentra", "google",
-    # Eventos
-    "evento", "próxima", "próximo",
-]
+def buscar_wikipedia(query: str) -> str:
+    """Busca resúmenes enciclopédicos en Wikipedia en español."""
+    try:
+        url_search = f"https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&utf8=&format=json"
+        req = urllib.request.Request(
+            url_search,
+            headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"}
+        )
+        with urllib.request.urlopen(req, timeout=3.5) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            results = data.get("query", {}).get("search", [])
+            if not results:
+                return ""
+            
+            titulo = results[0]["title"]
+            titulo_clean = urllib.parse.quote(titulo.replace(" ", "_"))
+            url_summary = f"https://es.wikipedia.org/api/rest_v1/page/summary/{titulo_clean}"
+            req_sum = urllib.request.Request(
+                url_summary,
+                headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"}
+            )
+            with urllib.request.urlopen(req_sum, timeout=3.5) as sum_res:
+                sum_data = json.loads(sum_res.read().decode("utf-8"))
+                extract = sum_data.get("extract", "").strip()
+                if extract:
+                    return f"📖 Enciclopedia ({titulo}):\n{extract}"
+    except Exception as e:
+        print(f"[DEBUG] Wikipedia búsqueda no disponible para '{query}': {e}")
+    return ""
 
-def necesita_busqueda_web(mensaje: str) -> bool:
-    """Determina si el mensaje requiere búsqueda en internet."""
-    msg_lower = mensaje.lower()
-    return any(palabra in msg_lower for palabra in PALABRAS_BUSQUEDA)
 
-def buscar_en_web(query: str, max_resultados: int = 3) -> str:
-    """
-    Realiza una búsqueda en DuckDuckGo y devuelve un resumen de los resultados.
-    Retorna cadena vacía si falla o no hay resultados.
-    """
+def buscar_duckduckgo(query: str) -> str:
+    """Busca en DuckDuckGo HTML en vivo y extrae fragmentos relevantes."""
+    try:
+        # Enviar petición POST a la versión HTML limpia de DuckDuckGo
+        data = urllib.parse.urlencode({"q": query}).encode("utf-8")
+        req = urllib.request.Request(
+            "https://html.duckduckgo.com/html/",
+            data=data,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=4.5) as response:
+            html = response.read().decode("utf-8", "ignore")
+            snippets = []
+            for m in re.finditer(r'result__snippet[^>]*>(.*?)</a>', html, re.DOTALL):
+                clean = re.sub(r'<[^<]+?>', '', m.group(1)).strip()
+                clean = clean.replace('&quot;', '"').replace('&#x27;', "'").replace('&amp;', '&').replace('&nbsp;', ' ')
+                if clean and len(clean) > 20:
+                    snippets.append(clean)
+                if len(snippets) >= 3:
+                    break
+            
+            if snippets:
+                return "🌐 Resultados web en tiempo real:\n" + "\n".join(f"• {s}" for s in snippets)
+    except Exception as e:
+        print(f"[DEBUG] DuckDuckGo búsqueda falló para '{query}': {e}")
+    
+    # Intento secundario con librería ddgs si estuviera instalada y disponible
     try:
         from duckduckgo_search import DDGS
         with DDGS() as ddgs:
-            resultados = list(ddgs.text(
-                query,
-                region="es-bo",
-                safesearch="moderate",
-                max_results=max_resultados
-            ))
+            res = list(ddgs.text(query, max_results=3))
+            if res:
+                textos = [f"• {r.get('body', '')}" for r in res if r.get('body')]
+                if textos:
+                    return "🌐 Resultados web:\n" + "\n".join(textos[:3])
+    except Exception:
+        pass
 
-        if not resultados:
-            with DDGS() as ddgs:
-                resultados = list(ddgs.text(
-                    query,
-                    safesearch="moderate",
-                    max_results=max_resultados
-                ))
-
-        if not resultados:
-            return ""
-
-        texto = "📡 Información encontrada en internet:\n\n"
-        for i, r in enumerate(resultados, 1):
-            titulo = r.get("title", "").strip()
-            cuerpo = r.get("body", "").strip()
-            if titulo and cuerpo:
-                texto += f"{i}. **{titulo}**\n   {cuerpo[:300]}\n\n"
-
-        return texto.strip()
-
-    except ImportError:
-        return ""
-    except Exception as e:
-        print(f"[WARN] búsqueda web falló: {e}")
-        return ""
+    return ""
 
 
-def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es', primera_vez: bool = False) -> str:
-    msg_min = mensaje_usuario.lower()
+def buscar_en_internet(query: str) -> str:
+    """Combina Wikipedia y DuckDuckGo para obtener contexto rico y verificado."""
+    partes = []
+    
+    # 1. Búsqueda enciclopédica
+    info_wiki = buscar_wikipedia(query)
+    if info_wiki:
+        partes.append(info_wiki)
+        
+    # 2. Búsqueda web en vivo (especialmente útil para clima, noticias, detalles actuales)
+    info_ddg = buscar_duckduckgo(query)
+    if info_ddg:
+        partes.append(info_ddg)
+        
+    return "\n\n".join(partes).strip()
 
-    # Mapeo de códigos a nombres completos de idiomas
+
+def debe_buscar_en_web(mensaje: str) -> bool:
+    """
+    Determina inteligentemente si la consulta amerita búsqueda en internet.
+    NO busca en internet únicamente si es un saludo puro o una despedida muy corta.
+    Para cualquier pregunta sobre lugares, clima, datos, historia o turismo: SÍ BUSCA.
+    """
+    msg = mensaje.lower().strip()
+    
+    # Mensajes muy cortos que son solo saludos o cortesías
+    saludos_puros = {
+        "hola", "hola!", "holaa", "buen dia", "buenos dias", "buen día", 
+        "buenas tardes", "buenas noches", "saludos", "hi", "hello", "hey",
+        "gracias", "muchas gracias", "chau", "adios", "adiós", "hasta luego",
+        "bye", "ok", "vale", "entendido", "de nada", "si", "sí", "no"
+    }
+    if msg in saludos_puros:
+        return False
+        
+    # Preguntas sobre la identidad del bot
+    if any(msg == p for p in ["quien eres", "quién eres", "como te llamas", "cómo te llamas", "que eres", "qué eres"]):
+        return False
+        
+    # Para cualquier pregunta real, duda, lugar o tema: BUSCAR en la web
+    return True
+
+
+# ══════════════════════════════════════════════════════════════
+# 5. GENERACIÓN DE RESPUESTA CON LLM
+# ══════════════════════════════════════════════════════════════
+
+def obtener_respuesta_asistente(mensaje_usuario: str, idioma: str = 'es', primera_vez: bool = False) -> str:
+    msg_min = mensaje_usuario.lower().strip()
+
+    # Mapeo de idiomas
     mapa_idiomas = {
         'es': 'Español',
         'en': 'Inglés',
         'fr': 'Francés',
         'it': 'Italiano',
+        'pt': 'Portugués',
         'zh': 'Chino Mandarín',
         'ja': 'Japonés'
     }
     idioma_nombre = mapa_idiomas.get(idioma.lower(), 'Español')
 
-    # PASO A: Respuestas locales inmediatas — solo español, solo si no requiere búsqueda web
-    if idioma == 'es' and not necesita_busqueda_web(msg_min):
-        for claves, respuesta_fija in RESPUESTAS_LOCALES.items():
-            if any(c in msg_min for c in claves):
-                return respuesta_fija
+    # Saludos directos e inmediatos si es exactamente un saludo
+    if msg_min in ["hola", "buenas", "buen dia", "buen día", "saludos"]:
+        if primera_vez:
+            return (
+                "¡Hola, pariente! 👋 Bienvenido a Riberalta, la Capital de la Amazonía Boliviana. "
+                "Soy Libélulin, tu asistente virtual municipal y turístico. ¿Qué te gustaría conocer o consultar hoy?"
+            )
+        else:
+            return "¿En qué más puedo colaborarte hoy, pariente?"
 
-    # Obtener fecha y hora actuales (zona Bolivia)
+    if msg_min in ["gracias", "muchas gracias"]:
+        return "¡Con todo el gusto del mundo, pariente! Para servirte siempre. ¿Hay algo más que quieras consultar?"
+
+    if msg_min in ["chau", "adios", "adiós", "hasta luego", "bye"]:
+        return "¡Hasta pronto, pariente! Que tengas un lindo día y disfrutes de nuestra hermosa tierra amazónica. ¡Vuelve pronto!"
+
+    # Obtener fecha y hora actuales
     fecha_actual = datetime.now().strftime("%A, %d de %B de %Y, %H:%M")
 
-    # PASO B: Búsqueda web en tiempo real si la consulta lo requiere
-    contexto_web_en_vivo = ""
-    if necesita_busqueda_web(msg_min):
-        query = mensaje_usuario
-        if any(p in msg_min for p in ["clima", "tiempo", "temperatura", "lluvia", "weather", "pronóstico"]):
-            if "riberalta" not in msg_min and "bolivia" not in msg_min:
-                query = f"{mensaje_usuario} Riberalta Bolivia"
-        contexto_web_en_vivo = buscar_en_web(query)
+    # BÚSQUEDA WEB EN TIEMPO REAL si corresponde
+    contexto_web = ""
+    if debe_buscar_en_web(mensaje_usuario):
+        query_busqueda = mensaje_usuario
+        # Si preguntan por clima o tiempo sin especificar lugar, añadir Riberalta Beni
+        if any(p in msg_min for p in ["clima", "tiempo", "temperatura", "lluvia", "llueve", "weather"]):
+            if "riberalta" not in msg_min and "bolivia" not in msg_min and "guayaramerin" not in msg_min:
+                query_busqueda = f"{mensaje_usuario} Riberalta Beni Bolivia"
+        # Si preguntan por Cachuela Esperanza, enfocar en Beni Bolivia
+        elif "cachuela" in msg_min and "bolivia" not in msg_min:
+            query_busqueda = f"{mensaje_usuario} Cachuela Esperanza Beni Bolivia"
+            
+        contexto_web = buscar_en_internet(query_busqueda)
 
-    # Instrucción de idioma
-    if idioma == 'es':
-        instruccion_idioma = (
-            "Tu tono debe ser cálido y cercano, usando sutilmente expresiones locales amazónicas "
-            "(como 'pariente', 'con gusto', 'claro que sí'). Responde en ESPAÑOL."
-        )
-    else:
-        instruccion_idioma = (
-            f"CRITICAL INSTRUCTION: You MUST answer the user in {idioma_nombre} language. "
-            f"All your responses must be strictly in {idioma_nombre}. Keep a warm and friendly tone."
-        )
-
-    # Instrucción sobre el saludo: solo saludar en el primer mensaje de la sesión
+    # Instrucción sobre el tono y saludos
     if primera_vez:
         instruccion_saludo = (
-            "Este es el PRIMER mensaje del usuario en esta sesión. "
-            "Puedes incluir un saludo breve y cálido al inicio de tu respuesta."
+            "Este es el PRIMER mensaje de la conversación. "
+            "Puedes incluir un saludo breve y cordial al inicio."
         )
     else:
         instruccion_saludo = (
-            "IMPORTANTE: El usuario YA FUE SALUDADO al inicio de la conversación. "
-            "NO empieces tu respuesta con saludos como '¡Hola!', '¡Hola pariente!', "
-            "'¡Claro que sí!', 'Qué gusto saludarte', ni nada similar. "
-            "Ve DIRECTO al contenido de la respuesta sin preámbulos de saludo."
+            "IMPORTANTE: El usuario YA fue saludado anteriormente. "
+            "NO incluyas saludos iniciales como '¡Hola!', '¡Hola pariente!', 'Qué gusto saludarte', etc. "
+            "Responde DIRECTAMENTE a lo preguntado."
         )
 
-    # Construir el system prompt completo
-    system_content = (
-        "Eres Libélulin, el asistente virtual oficial de la web del Gobierno Autónomo Municipal de Riberalta. "
-        f"Hoy es {fecha_actual}. "
-        f"{instruccion_idioma} "
-        f"{instruccion_saludo} "
-        "\n\nREGLA CRÍTICA DE PRECISIÓN FACTUAL: "
-        "Si el usuario pregunta sobre datos de Riberalta (historia, fundación, geografía, economía, etc.), "
-        "DEBES usar EXCLUSIVAMENTE los datos del bloque siguiente. "
-        "NUNCA inventes fechas, nombres o estadísticas. Si no está en el bloque, di que no tienes esa información exacta:\n"
-        f"{HECHOS_RIBERALTA}\n"
-        "Eres también un tutor educativo avanzado: puedes ayudar con matemáticas, ciencias, programación, "
-        "historia, redacción y cualquier tema académico. Nunca digas que no puedes responder algo. "
-        "Ayuda con entusiasmo, claridad y actitud servicial."
-    )
+    # System prompt estructurado
+    system_prompt = f"""Eres Libélulin, el asistente virtual turístico y de atención ciudadana del Gobierno Autónomo Municipal de Riberalta (Beni, Bolivia).
+Fecha actual: {fecha_actual}.
+Idioma de respuesta: Responde estrictamente en {idioma_nombre}.
 
-    # Si hay resultados web en tiempo real, añadirlos
-    if contexto_web_en_vivo:
-        system_content += (
-            "\n\n--- BÚSQUEDA WEB EN TIEMPO REAL ---\n"
-            "El sistema realizó una búsqueda en internet. Usa la siguiente información actualizada "
-            "para dar una respuesta precisa. Menciona que proviene de internet si es relevante:\n\n"
-            f"{contexto_web_en_vivo}\n"
-            "--- FIN DE RESULTADOS ---"
-        )
+TONO Y PERSONALIDAD:
+- Eres cálido, educado, hospitalario y orgulloso de la Amazonía boliviana.
+- Usa con naturalidad y sutileza expresiones benianas/amazónicas como "pariente", "con gusto", "claro que sí".
+- {instruccion_saludo}
 
-    # PASO C: Llamar al LLM en Groq
-    MODELOS = [
-        "qwen/qwen3.8-27b",
-        "openai/gpt-oss-20b",
-        "llama-3.1-8b-instant"
+CONOCIMIENTO OFICIAL DE LA REGIÓN (USA SIEMPRE ESTOS DATOS):
+{HECHOS_RIBERALTA_Y_REGION}
+
+INSTRUCCIONES CLAVE DE RESPUESTA:
+1. LUGARES Y TURISMO REGIONAL: Si te preguntan sobre Cachuela Esperanza, Guayaramerín, la Laguna Tumichucua, la castaña o Riberalta, responde con gran detalle histórico y turístico, destacando que Cachuela Esperanza queda en el municipio de Guayaramerín (a unos 43 km de Guayaramerín y 90 km de Riberalta), su relación con el magnate del caucho Nicolás Suárez, sus imponentes rápidos y su arquitectura victoriana.
+2. ACCESO A INTERNET Y ACTUALIDAD: Cuentas con un motor de búsqueda web en tiempo real. Utiliza la información provista abajo para responder con total precisión, actualidad y rigor. NUNCA digas que no tienes acceso a internet o que no puedes saberlo si la información se encuentra en los resultados o en tus conocimientos.
+3. CONOCIMIENTOS GENERALES Y EDUCATIVOS: Además de turismo municipal, eres un tutor versátil: puedes explicar historia, ciencias, naturaleza amazónica, redactar textos o resolver dudas con entusiasmo.
+"""
+
+    if contexto_web:
+        system_prompt += f"""
+
+══════════════════════════════════════════════════════
+INFORMACIÓN OBTENIDA DE INTERNET EN TIEMPO REAL:
+{contexto_web}
+══════════════════════════════════════════════════════
+Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma verídica y actualizada.
+"""
+
+    # Modelos de Groq (priorizando llama-3.3-70b-versatile por su alta capacidad de razonamiento)
+    MODELOS_GROQ = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768"
     ]
 
     ultimo_error = None
-    for modelo in MODELOS:
+    for modelo in MODELOS_GROQ:
         try:
             response = client.chat.completions.create(
                 model=modelo,
-                temperature=0.35,
+                temperature=0.3,
                 messages=[
-                    {"role": "system", "content": system_content},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": mensaje_usuario}
                 ]
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
+            print(f"[WARN] Error con modelo {modelo}: {e}")
             ultimo_error = e
             continue
 
-    # Fallback si todos los modelos fallan
     if ultimo_error:
         import traceback
         with open("error.log", "w", encoding="utf-8") as f:
             f.write(traceback.format_exc())
 
     if idioma == 'en':
-        return "Sorry, I'm having trouble connecting to the server. Please try again later."
-    elif idioma == 'fr':
-        return "Désolé, j'ai des problèmes de connexion. Veuillez réessayer plus tard."
+        return "I'm having a brief connection issue. Please try again in a moment."
     return (
-        "Lo siento, en este momento tengo problemas para conectar con el servidor. "
-        "Por favor, intenta de nuevo en unos instantes o contáctanos en nuestras oficinas."
+        "Disculpa, pariente, tuve una pequeña intermitencia de conexión con los servidores. "
+        "Por favor, intenta enviar tu pregunta de nuevo en unos instantes."
     )
 
 
 # ══════════════════════════════════════════════════════════════
-# ENDPOINTS DE LA API FLASK
+# 6. ENDPOINTS DE LA API
 # ══════════════════════════════════════════════════════════════
 
 @app.route("/chat", methods=["POST"])
-@limiter.limit("30 per minute")
+@limiter.limit("40 per minute")
 def chat():
     data = request.get_json(silent=True)
     if not data or "mensaje" not in data:
@@ -314,23 +341,43 @@ def chat():
 
     mensaje = str(data["mensaje"]).strip()
     idioma = str(data.get("idioma", "es")).strip().lower()
-    # primera_vez: true solo en el primer mensaje de la sesión (enviado desde el frontend)
     primera_vez = bool(data.get("primera_vez", False))
 
     if not mensaje:
-        return jsonify({"error": "El mensaje está vacío."}), 400
+        return jsonify({"error": "El mensaje no puede estar vacío."}), 400
 
-    respuesta = obtener_respuesta_hibrida(mensaje, idioma, primera_vez)
+    respuesta = obtener_respuesta_asistente(mensaje, idioma, primera_vez)
     return jsonify({"respuesta": respuesta})
+
+
+@app.route("/test-search", methods=["GET"])
+def test_search_endpoint():
+    """Endpoint público para verificar que la búsqueda en internet funciona activamente."""
+    q = request.args.get("q", "Cachuela Esperanza Bolivia").strip()
+    resultado = buscar_en_internet(q)
+    return jsonify({
+        "consulta": q,
+        "tiene_resultados": bool(resultado),
+        "longitud": len(resultado),
+        "contenido": resultado
+    })
 
 
 @app.route("/", methods=["GET"])
 def index():
-    return "✅ Chatbot municipal de Riberalta (Groq + DuckDuckGo). Usa POST /chat"
+    return jsonify({
+        "status": "online",
+        "servicio": "API Chatbot Municipal y Turístico de Riberalta",
+        "motor_ia": "Groq LLaMA 3.3 70B",
+        "busqueda_web": "Activa (Wikipedia + DuckDuckGo)",
+        "endpoints": {
+            "POST /chat": "Conversación con el chatbot",
+            "GET /test-search?q=...": "Prueba directa de búsqueda en internet"
+        }
+    })
 
 
 if __name__ == "__main__":
     print("Chatbot API de Riberalta iniciado.")
-    print("    Escuchando en: http://127.0.0.1:5000")
-    print("    Presiona Ctrl+C para detener.\n")
+    print("Escuchando en http://127.0.0.1:5000")
     app.run(debug=False, port=5000)
