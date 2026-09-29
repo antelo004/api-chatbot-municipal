@@ -2,7 +2,7 @@
 chatbot.py — Servidor Flask para el Chatbot del Municipio de Riberalta
 =====================================================================
 Requisitos en tu entorno aislado (.venv):
-    pip install flask flask-cors flask-limiter openai python-dotenv
+    pip install flask flask-cors flask-limiter openai python-dotenv duckduckgo-search
 
 Arrancar:
     python chatbot.py
@@ -78,6 +78,79 @@ Datos Operativos del Municipio:
 - Contacto y teléfono: Pueden comunicarse al correo oficial alcaldia@riberalta.gob.bo o aproximarse a ventanillas de atención central.
 """
 
+# ══════════════════════════════════════════════════════════════
+# 5. BÚSQUEDA WEB — DuckDuckGo (sin API key, gratuito)
+# ══════════════════════════════════════════════════════════════
+
+# Palabras clave que indican que la consulta necesita información en tiempo real
+PALABRAS_BUSQUEDA = [
+    # Clima y meteorología
+    "clima", "tiempo", "temperatura", "lluvia", "llueve", "calor", "frío",
+    "weather", "forecast", "pronóstico", "humedad", "viento",
+    # Noticias y actualidad
+    "noticia", "noticias", "hoy", "ahora", "actual", "último", "últimas",
+    "news", "latest", "today", "reciente", "novedad",
+    # Preguntas factuales dinámicas
+    "precio", "cotización", "dólar", "boliviano", "tipo de cambio",
+    "partido", "resultado", "score", "marcador",
+    "quién ganó", "quién es el presidente", "elección", "elecciones",
+    # Búsqueda explícita
+    "busca", "buscar", "busque", "encuentra", "google",
+    # Eventos y fechas futuras
+    "evento", "cuándo", "cuando es", "próxima", "próximo",
+]
+
+def necesita_busqueda_web(mensaje: str) -> bool:
+    """Determina si el mensaje requiere búsqueda en internet."""
+    msg_lower = mensaje.lower()
+    return any(palabra in msg_lower for palabra in PALABRAS_BUSQUEDA)
+
+def buscar_en_web(query: str, max_resultados: int = 3) -> str:
+    """
+    Realiza una búsqueda en DuckDuckGo y devuelve un resumen de los resultados.
+    Retorna cadena vacía si falla o no hay resultados.
+    """
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            resultados = list(ddgs.text(
+                query,
+                region="es-bo",   # Bolivia en español (fallback a global si no hay)
+                safesearch="moderate",
+                max_results=max_resultados
+            ))
+        
+        if not resultados:
+            # Intentar sin región específica
+            with DDGS() as ddgs:
+                resultados = list(ddgs.text(
+                    query,
+                    safesearch="moderate",
+                    max_results=max_resultados
+                ))
+        
+        if not resultados:
+            return ""
+        
+        # Formatear los resultados para incluir en el contexto del LLM
+        texto = "📡 Información encontrada en internet:\n\n"
+        for i, r in enumerate(resultados, 1):
+            titulo = r.get("title", "").strip()
+            cuerpo = r.get("body", "").strip()
+            if titulo and cuerpo:
+                texto += f"{i}. **{titulo}**\n   {cuerpo[:300]}\n\n"
+        
+        return texto.strip()
+    
+    except ImportError:
+        # ddgs no está instalada en este entorno
+        return ""
+    except Exception as e:
+        # Registrar pero no romper el flujo
+        print(f"[WARN] búsqueda web falló: {e}")
+        return ""
+
+
 def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
     msg_min = mensaje_usuario.lower()
     
@@ -93,13 +166,26 @@ def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
     idioma_nombre = mapa_idiomas.get(idioma.lower(), 'Español')
     
     # PASO A: Verificar si coincide con alguna palabra clave local (Costo 0) - SOLO si el idioma es español
-    if idioma == 'es':
+    # Excluimos saludos si además contiene palabras de búsqueda (ej: "hola, dime el clima")
+    if idioma == 'es' and not necesita_busqueda_web(msg_min):
         for claves, respuesta_fija in RESPUESTAS_LOCALES.items():
             if any(c in msg_min for c in claves):
                 return respuesta_fija
-            
+        
     # Obtener fecha y hora actuales para que el bot tenga contexto del tiempo
     fecha_actual = datetime.now().strftime("%A, %d de %B de %Y, %H:%M")
+    
+    # PASO B: Búsqueda web si la consulta lo requiere
+    contexto_web_en_vivo = ""
+    if necesita_busqueda_web(msg_min):
+        # Construir una query optimizada para el buscador
+        query = mensaje_usuario
+        # Para preguntas de clima de Riberalta sin mencionar la ciudad, agregarla
+        if any(p in msg_min for p in ["clima", "tiempo", "temperatura", "lluvia", "weather", "pronóstico"]):
+            if "riberalta" not in msg_min and "bolivia" not in msg_min:
+                query = f"{mensaje_usuario} Riberalta Bolivia"
+        
+        contexto_web_en_vivo = buscar_en_web(query)
     
     # Construcción de la instrucción de idioma
     if idioma == 'es':
@@ -107,7 +193,31 @@ def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
     else:
         instruccion_idioma = f"CRITICAL INSTRUCTION: You MUST answer the user in {idioma_nombre} language. All your responses must be strictly translated to {idioma_nombre}. However, keep a warm and friendly tone."
     
-    # PASO B: Si es una duda abierta o educativa, usar LLM en Groq con lista de modelos activos
+    # Construir el mensaje de sistema con o sin contexto web en vivo
+    system_content = (
+        "Eres Libélulin, el asistente virtual oficial, amigable y carismático de la web del Gobierno de Riberalta. "
+        f"Hoy es {fecha_actual}. "
+        f"{instruccion_idioma} "
+        "Si el ciudadano te pregunta sobre el motivo de la creación de la web o datos de la alcaldía, básate en esto:\n"
+        f"{CONTEXTO_WEB}\n"
+        "Eres un tutor educativo y una Inteligencia Artificial avanzada: SI PUEDES responder cualquier pregunta general, "
+        "ayudar a escolares, universitarios y ciudadanos con tareas, matemáticas, ciencias, biología, programación, historia, "
+        "redacción o cualquier tema académico o educativo que te consulten, como si fueras ChatGPT con sabiduría amazónica. "
+        "Nunca digas que no puedes responder algo solo por no ser de la alcaldía. Simplemente ayuda con entusiasmo, claridad y actitud servicial."
+    )
+    
+    # Si tenemos resultados de búsqueda, añadirlos como contexto
+    if contexto_web_en_vivo:
+        system_content += (
+            "\n\n--- BÚSQUEDA WEB EN TIEMPO REAL ---\n"
+            "El sistema realizó una búsqueda en internet para responder esta consulta. "
+            "Usa la siguiente información actualizada para dar una respuesta precisa y útil. "
+            "Menciona que la información proviene de internet si es relevante:\n\n"
+            f"{contexto_web_en_vivo}\n"
+            "--- FIN DE RESULTADOS DE BÚSQUEDA ---"
+        )
+    
+    # PASO C: Si es una duda abierta o educativa, usar LLM en Groq con lista de modelos activos
     MODELOS = [
         "qwen/qwen3.8-27b",
         "openai/gpt-oss-20b",
@@ -123,17 +233,7 @@ def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
                 messages=[
                     {
                         "role": "system", 
-                        "content": (
-                            "Eres Libélulin, el asistente virtual oficial, amigable y carismático de la web del Gobierno de Riberalta. "
-                            f"Hoy es {fecha_actual}. "
-                            f"{instruccion_idioma} "
-                            "Si el ciudadano te pregunta sobre el motivo de la creación de la web o datos de la alcaldía, básate en esto:\n"
-                            f"{CONTEXTO_WEB}\n"
-                            "Eres un tutor educativo y una Inteligencia Artificial avanzada: SI PUEDES responder cualquier pregunta general, "
-                            "ayudar a escolares, universitarios y ciudadanos con tareas, matemáticas, ciencias, biología, programación, historia, "
-                            "redacción o cualquier tema académico o educativo que te consulten, como si fueras ChatGPT con sabiduría amazónica. "
-                            "Nunca digas que no puedes responder algo solo por no ser de la alcaldía. Simplemente ayuda con entusiasmo, claridad y actitud servicial."
-                        )
+                        "content": system_content
                     },
                     {"role": "user", "content": mensaje_usuario}
                 ]

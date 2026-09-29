@@ -4,3 +4,4 @@ flask-limiter
 openai
 python-dotenv
 gunicorn
+duckduckgo-search
