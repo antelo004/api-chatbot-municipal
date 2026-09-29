@@ -8,7 +8,7 @@ Arrancar:
     python chatbot.py
 
 El servidor escucha en http://127.0.0.1:5000
-Endpoint: POST /chat   →  { "mensaje": "..." }  →  { "respuesta": "..." }
+Endpoint: POST /chat   →  { "mensaje": "...", "idioma": "es", "primera_vez": true }  →  { "respuesta": "..." }
 """
 
 from flask import Flask, request, jsonify
@@ -38,7 +38,51 @@ client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-# 3. FILTRO HÍBRIDO: Respuestas locales inmediatas (Costo $0 y velocidad instantánea)
+# ══════════════════════════════════════════════════════════════
+# 3. HECHOS VERIFICADOS DE RIBERALTA — El LLM DEBE usar estos datos exactos.
+#    Nunca debe inventar fechas, nombres ni estadísticas sobre Riberalta.
+# ══════════════════════════════════════════════════════════════
+HECHOS_RIBERALTA = """
+=== HECHOS VERIFICADOS DE RIBERALTA — USA SIEMPRE ESTOS DATOS, NUNCA LOS INVENTES ===
+
+HISTORIA:
+- Fecha de fundación oficial: 3 de febrero de 1894
+- Nombre histórico original: "Barranca Colorada"
+- Fundada estratégicamente en la confluencia de los ríos Beni y Madre de Dios
+- Se consolidó como eje central durante el auge del caucho y la goma (siglo XIX-XX)
+- Formalmente reconocida como municipio por el Estado boliviano en 1894
+
+GEOGRAFÍA:
+- Ubicación: confluencia de los ríos Beni y Madre de Dios
+- Departamento: Beni, Bolivia
+- Región: Amazonía boliviana (norte del Beni)
+- Apodo: "Capital de la Amazonía Boliviana" y "Corazón de la Amazonía"
+
+ECONOMÍA:
+- Principal exportación: Castaña amazónica (Bertholletia excelsa)
+- Riberalta es el primer exportador de castaña de Bolivia y del mundo
+- Industria castañera es el motor económico principal
+- Turismo ecológico en crecimiento
+
+CULTURA Y PUEBLOS:
+- Pueblos originarios principales: Chácobo y Cavineño
+- Mezcla de tradiciones originarias con herencia colona de la época gomera
+- Música, danza y artesanía local típicas de la Amazonía
+
+ALCALDÍA:
+- Nombre oficial: Gobierno Autónomo Municipal de Riberalta (GAMR)
+- Horarios de atención: lunes a viernes 08:00–12:00 y 14:00–18:00
+- Dirección: frente a la Plaza Principal de Riberalta
+- Correo: alcaldia@riberalta.gob.bo
+
+PLATAFORMA WEB:
+- Objetivo: reactivar el turismo local, digitalizar el acceso a información pública
+- Visión: Riberalta como referente de transparencia y modernización en la Amazonía boliviana
+
+=== FIN DE HECHOS VERIFICADOS ===
+"""
+
+# 4. FILTRO HÍBRIDO: Respuestas locales inmediatas (Costo $0 y velocidad instantánea)
 RESPUESTAS_LOCALES = {
     ("hola", "buenas", "buen día", "saludos"): (
         "¡Hola pariente! 👋 Soy Libélulin, tu asistente virtual del Gobierno Autónomo Municipal de Riberalta. "
@@ -65,19 +109,6 @@ RESPUESTAS_LOCALES = {
     ),
 }
 
-# 4. CONTEXTO INSTITUCIONAL EXCLUSIVO PARA LA IA (Sección "Quiénes somos" y Datos)
-CONTEXTO_WEB = """
-Información sobre esta plataforma web de Riberalta:
-- Motivo de creación: Esta plataforma web fue desarrollada formalmente con el objetivo clave de reactivar el turismo local, digitalizar el acceso a la información pública municipal y conectar de manera directa y moderna a los ciudadanos con la gestión de la alcaldía.
-- Visión: Convertir a Riberalta en un referente de transparencia, modernización y promoción digital en toda la región amazónica de Bolivia.
-- Desarrollo: Diseñado y optimizado con un enfoque multimedia y de desarrollo web eficiente por el equipo técnico regional.
-
-Datos Operativos del Municipio:
-- Horarios de atención: Atendemos de lunes a viernes de 08:00 a 12:00 por la mañana, y de 14:00 a 18:00 por la tarde.
-- Ubicación/Dirección: La alcaldía central se encuentra ubicada frente a la Plaza Principal de Riberalta.
-- Contacto y teléfono: Pueden comunicarse al correo oficial alcaldia@riberalta.gob.bo o aproximarse a ventanillas de atención central.
-"""
-
 # ══════════════════════════════════════════════════════════════
 # 5. BÚSQUEDA WEB — DuckDuckGo (sin API key, gratuito)
 # ══════════════════════════════════════════════════════════════
@@ -88,16 +119,16 @@ PALABRAS_BUSQUEDA = [
     "clima", "tiempo", "temperatura", "lluvia", "llueve", "calor", "frío",
     "weather", "forecast", "pronóstico", "humedad", "viento",
     # Noticias y actualidad
-    "noticia", "noticias", "hoy", "ahora", "actual", "último", "últimas",
+    "noticia", "noticias", "ahora", "actual", "último", "últimas",
     "news", "latest", "today", "reciente", "novedad",
     # Preguntas factuales dinámicas
     "precio", "cotización", "dólar", "boliviano", "tipo de cambio",
     "partido", "resultado", "score", "marcador",
-    "quién ganó", "quién es el presidente", "elección", "elecciones",
+    "quién es el presidente", "elección", "elecciones",
     # Búsqueda explícita
     "busca", "buscar", "busque", "encuentra", "google",
-    # Eventos y fechas futuras
-    "evento", "cuándo", "cuando es", "próxima", "próximo",
+    # Eventos
+    "evento", "próxima", "próximo",
 ]
 
 def necesita_busqueda_web(mensaje: str) -> bool:
@@ -115,45 +146,41 @@ def buscar_en_web(query: str, max_resultados: int = 3) -> str:
         with DDGS() as ddgs:
             resultados = list(ddgs.text(
                 query,
-                region="es-bo",   # Bolivia en español (fallback a global si no hay)
+                region="es-bo",
                 safesearch="moderate",
                 max_results=max_resultados
             ))
-        
+
         if not resultados:
-            # Intentar sin región específica
             with DDGS() as ddgs:
                 resultados = list(ddgs.text(
                     query,
                     safesearch="moderate",
                     max_results=max_resultados
                 ))
-        
+
         if not resultados:
             return ""
-        
-        # Formatear los resultados para incluir en el contexto del LLM
+
         texto = "📡 Información encontrada en internet:\n\n"
         for i, r in enumerate(resultados, 1):
             titulo = r.get("title", "").strip()
             cuerpo = r.get("body", "").strip()
             if titulo and cuerpo:
                 texto += f"{i}. **{titulo}**\n   {cuerpo[:300]}\n\n"
-        
+
         return texto.strip()
-    
+
     except ImportError:
-        # ddgs no está instalada en este entorno
         return ""
     except Exception as e:
-        # Registrar pero no romper el flujo
         print(f"[WARN] búsqueda web falló: {e}")
         return ""
 
 
-def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
+def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es', primera_vez: bool = False) -> str:
     msg_min = mensaje_usuario.lower()
-    
+
     # Mapeo de códigos a nombres completos de idiomas
     mapa_idiomas = {
         'es': 'Español',
@@ -164,60 +191,78 @@ def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
         'ja': 'Japonés'
     }
     idioma_nombre = mapa_idiomas.get(idioma.lower(), 'Español')
-    
-    # PASO A: Verificar si coincide con alguna palabra clave local (Costo 0) - SOLO si el idioma es español
-    # Excluimos saludos si además contiene palabras de búsqueda (ej: "hola, dime el clima")
+
+    # PASO A: Respuestas locales inmediatas — solo español, solo si no requiere búsqueda web
     if idioma == 'es' and not necesita_busqueda_web(msg_min):
         for claves, respuesta_fija in RESPUESTAS_LOCALES.items():
             if any(c in msg_min for c in claves):
                 return respuesta_fija
-        
-    # Obtener fecha y hora actuales para que el bot tenga contexto del tiempo
+
+    # Obtener fecha y hora actuales (zona Bolivia)
     fecha_actual = datetime.now().strftime("%A, %d de %B de %Y, %H:%M")
-    
-    # PASO B: Búsqueda web si la consulta lo requiere
+
+    # PASO B: Búsqueda web en tiempo real si la consulta lo requiere
     contexto_web_en_vivo = ""
     if necesita_busqueda_web(msg_min):
-        # Construir una query optimizada para el buscador
         query = mensaje_usuario
-        # Para preguntas de clima de Riberalta sin mencionar la ciudad, agregarla
         if any(p in msg_min for p in ["clima", "tiempo", "temperatura", "lluvia", "weather", "pronóstico"]):
             if "riberalta" not in msg_min and "bolivia" not in msg_min:
                 query = f"{mensaje_usuario} Riberalta Bolivia"
-        
         contexto_web_en_vivo = buscar_en_web(query)
-    
-    # Construcción de la instrucción de idioma
+
+    # Instrucción de idioma
     if idioma == 'es':
-        instruccion_idioma = "Tu tono debe ser cálido, entusiasta y cercano, utilizando sutilmente expresiones locales de la amazonía boliviana (como 'pariente', 'con gusto', 'claro que sí'). Responde en ESPAÑOL."
+        instruccion_idioma = (
+            "Tu tono debe ser cálido y cercano, usando sutilmente expresiones locales amazónicas "
+            "(como 'pariente', 'con gusto', 'claro que sí'). Responde en ESPAÑOL."
+        )
     else:
-        instruccion_idioma = f"CRITICAL INSTRUCTION: You MUST answer the user in {idioma_nombre} language. All your responses must be strictly translated to {idioma_nombre}. However, keep a warm and friendly tone."
-    
-    # Construir el mensaje de sistema con o sin contexto web en vivo
+        instruccion_idioma = (
+            f"CRITICAL INSTRUCTION: You MUST answer the user in {idioma_nombre} language. "
+            f"All your responses must be strictly in {idioma_nombre}. Keep a warm and friendly tone."
+        )
+
+    # Instrucción sobre el saludo: solo saludar en el primer mensaje de la sesión
+    if primera_vez:
+        instruccion_saludo = (
+            "Este es el PRIMER mensaje del usuario en esta sesión. "
+            "Puedes incluir un saludo breve y cálido al inicio de tu respuesta."
+        )
+    else:
+        instruccion_saludo = (
+            "IMPORTANTE: El usuario YA FUE SALUDADO al inicio de la conversación. "
+            "NO empieces tu respuesta con saludos como '¡Hola!', '¡Hola pariente!', "
+            "'¡Claro que sí!', 'Qué gusto saludarte', ni nada similar. "
+            "Ve DIRECTO al contenido de la respuesta sin preámbulos de saludo."
+        )
+
+    # Construir el system prompt completo
     system_content = (
-        "Eres Libélulin, el asistente virtual oficial, amigable y carismático de la web del Gobierno de Riberalta. "
+        "Eres Libélulin, el asistente virtual oficial de la web del Gobierno Autónomo Municipal de Riberalta. "
         f"Hoy es {fecha_actual}. "
         f"{instruccion_idioma} "
-        "Si el ciudadano te pregunta sobre el motivo de la creación de la web o datos de la alcaldía, básate en esto:\n"
-        f"{CONTEXTO_WEB}\n"
-        "Eres un tutor educativo y una Inteligencia Artificial avanzada: SI PUEDES responder cualquier pregunta general, "
-        "ayudar a escolares, universitarios y ciudadanos con tareas, matemáticas, ciencias, biología, programación, historia, "
-        "redacción o cualquier tema académico o educativo que te consulten, como si fueras ChatGPT con sabiduría amazónica. "
-        "Nunca digas que no puedes responder algo solo por no ser de la alcaldía. Simplemente ayuda con entusiasmo, claridad y actitud servicial."
+        f"{instruccion_saludo} "
+        "\n\nREGLA CRÍTICA DE PRECISIÓN FACTUAL: "
+        "Si el usuario pregunta sobre datos de Riberalta (historia, fundación, geografía, economía, etc.), "
+        "DEBES usar EXCLUSIVAMENTE los datos del bloque siguiente. "
+        "NUNCA inventes fechas, nombres o estadísticas. Si no está en el bloque, di que no tienes esa información exacta:\n"
+        f"{HECHOS_RIBERALTA}\n"
+        "Eres también un tutor educativo avanzado: puedes ayudar con matemáticas, ciencias, programación, "
+        "historia, redacción y cualquier tema académico. Nunca digas que no puedes responder algo. "
+        "Ayuda con entusiasmo, claridad y actitud servicial."
     )
-    
-    # Si tenemos resultados de búsqueda, añadirlos como contexto
+
+    # Si hay resultados web en tiempo real, añadirlos
     if contexto_web_en_vivo:
         system_content += (
             "\n\n--- BÚSQUEDA WEB EN TIEMPO REAL ---\n"
-            "El sistema realizó una búsqueda en internet para responder esta consulta. "
-            "Usa la siguiente información actualizada para dar una respuesta precisa y útil. "
-            "Menciona que la información proviene de internet si es relevante:\n\n"
+            "El sistema realizó una búsqueda en internet. Usa la siguiente información actualizada "
+            "para dar una respuesta precisa. Menciona que proviene de internet si es relevante:\n\n"
             f"{contexto_web_en_vivo}\n"
-            "--- FIN DE RESULTADOS DE BÚSQUEDA ---"
+            "--- FIN DE RESULTADOS ---"
         )
-    
-    # PASO C: Si es una duda abierta o educativa, usar LLM en Groq con lista de modelos activos
+
+    # PASO C: Llamar al LLM en Groq
     MODELOS = [
         "qwen/qwen3.8-27b",
         "openai/gpt-oss-20b",
@@ -229,12 +274,9 @@ def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
         try:
             response = client.chat.completions.create(
                 model=modelo,
-                temperature=0.4,
+                temperature=0.35,
                 messages=[
-                    {
-                        "role": "system", 
-                        "content": system_content
-                    },
+                    {"role": "system", "content": system_content},
                     {"role": "user", "content": mensaje_usuario}
                 ]
             )
@@ -243,18 +285,21 @@ def obtener_respuesta_hibrida(mensaje_usuario: str, idioma: str = 'es') -> str:
             ultimo_error = e
             continue
 
-    # Si todos los modelos fallan, registrar el error y dar respuesta de respaldo
+    # Fallback si todos los modelos fallan
     if ultimo_error:
         import traceback
         with open("error.log", "w", encoding="utf-8") as f:
             f.write(traceback.format_exc())
-    
-    if idioma == 'en': return "Sorry, I am having trouble connecting to the server. Please try again later."
-    elif idioma == 'fr': return "Désolé, j'ai des problèmes de connexion avec le serveur. Veuillez réessayer plus tard."
+
+    if idioma == 'en':
+        return "Sorry, I'm having trouble connecting to the server. Please try again later."
+    elif idioma == 'fr':
+        return "Désolé, j'ai des problèmes de connexion. Veuillez réessayer plus tard."
     return (
-        "Lo siento, en este momento tengo problemas para conectar con el servidor central. "
+        "Lo siento, en este momento tengo problemas para conectar con el servidor. "
         "Por favor, intenta de nuevo en unos instantes o contáctanos en nuestras oficinas."
     )
+
 
 # ══════════════════════════════════════════════════════════════
 # ENDPOINTS DE LA API FLASK
@@ -269,23 +314,23 @@ def chat():
 
     mensaje = str(data["mensaje"]).strip()
     idioma = str(data.get("idioma", "es")).strip().lower()
+    # primera_vez: true solo en el primer mensaje de la sesión (enviado desde el frontend)
+    primera_vez = bool(data.get("primera_vez", False))
 
     if not mensaje:
         return jsonify({"error": "El mensaje está vacío."}), 400
 
-    # Ejecutar la lógica híbrida (Local e IA unificadas) con el idioma especificado
-    respuesta = obtener_respuesta_hibrida(mensaje, idioma)
-
+    respuesta = obtener_respuesta_hibrida(mensaje, idioma, primera_vez)
     return jsonify({"respuesta": respuesta})
 
 
 @app.route("/", methods=["GET"])
 def index():
-    return "✅ Servidor API del chatbot municipal de Riberalta corriendo con Groq. Usa POST /chat"
+    return "✅ Chatbot municipal de Riberalta (Groq + DuckDuckGo). Usa POST /chat"
 
 
 if __name__ == "__main__":
-    print("Chatbot API de Riberalta (Groq + Flask) iniciado correctamente.")
+    print("Chatbot API de Riberalta iniciado.")
     print("    Escuchando en: http://127.0.0.1:5000")
-    print("    Presiona Ctrl+C para detener el servidor.\n")
+    print("    Presiona Ctrl+C para detener.\n")
     app.run(debug=False, port=5000)

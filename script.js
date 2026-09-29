@@ -48,6 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // Rastrear si es el primer mensaje de la sesión (para no repetir saludos)
+    let primerMensaje = true;
+
     // 2. Función para enviar el mensaje
     async function enviarMensaje() {
         const texto = chatInput.value.trim();
@@ -72,7 +75,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ mensaje: texto })
+                body: JSON.stringify({
+                    mensaje: texto,
+                    primera_vez: primerMensaje
+                })
             });
 
             if (!response.ok) {
@@ -94,6 +100,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Escribir la respuesta carácter a carácter
             await typeText(botText, data.respuesta, 18);
+
+            // Ya no es el primer mensaje de la sesión
+            primerMensaje = false;
 
         } catch (error) {
             console.error("Error al conectar con el chatbot:", error);

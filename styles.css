@@ -1478,11 +1478,79 @@ footer {
     color: #fff;
 }
 
+/* ── RESPONSIVE CHATBOT ── */
+@media (max-width: 768px) {
+    /* Contenedor del botón toggle */
+    .chatbot-contenedor {
+        bottom: 1.2rem;
+        right: 1rem;
+    }
+
+    /* Botón toggle más pequeño en móvil */
+    #chatbot-toggle {
+        width: 52px;
+        height: 52px;
+    }
+
+    /* Ventana del chat ocupa casi toda la pantalla */
+    #chatbot-window {
+        width: calc(100vw - 1.5rem);
+        right: 0.75rem;
+        left: 0.75rem;
+        bottom: 0;
+        height: 88vh;
+        max-height: 88vh;
+        border-radius: 18px 18px 0 0;
+    }
+
+    /* Botón cerrar más grande y fácil de tocar en móvil */
+    #chat-cerrar {
+        width: 34px;
+        height: 34px;
+        font-size: 16px;
+        /* Área táctil mínima 44px sin agrandar el elemento */
+        touch-action: manipulation;
+    }
+
+    /* Header del chat: asegura que el X sea siempre visible */
+    .chat-header {
+        padding: 0.9rem 1rem;
+        gap: 10px;
+    }
+
+    /* Ocultar mascota toggle cuando chat está abierto — ya sin posibilidad de tapeado */
+    .chatbot-contenedor.chat-abierto #chatbot-toggle {
+        opacity: 0;
+        pointer-events: none;
+        transform: scale(0.7);
+    }
+
+    /* Input area más cómodo en móvil */
+    .chat-input-area {
+        margin: 0.4rem 0.6rem 0.8rem;
+        padding: 0.35rem 0.4rem 0.35rem 0.85rem;
+    }
+
+    /* Mensajes con padding más compacto */
+    #chat-mensajes {
+        padding: 0.7rem 0.8rem 0.4rem;
+    }
+}
+
 @media (max-width: 420px) {
     #chatbot-window {
-        width: calc(100vw - 2rem);
-        right: 1rem;
-        height: 68vh;
+        width: 100vw;
+        right: 0;
+        left: 0;
+        border-radius: 16px 16px 0 0;
+        height: 90vh;
+        max-height: 90vh;
+    }
+
+    /* En pantallas muy pequeñas, el saludo flotante puede ocultarse */
+    .chatbot-saludo {
+        font-size: 12px;
+        padding: 10px 12px;
     }
 }
 
