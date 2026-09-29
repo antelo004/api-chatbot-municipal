@@ -1038,6 +1038,14 @@ footer {
     transform: translateY(-12px) scale(0.95) !important;
 }
 
+/* Ocultar la mascota/toggle cuando el chat está abierto para no tapar el botón de enviar */
+.chatbot-contenedor.chat-abierto #chatbot-toggle {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.8);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
 /* Puntitos de pensamiento grandes */
 .chatbot-saludo::before {
     content: '';
@@ -1084,10 +1092,10 @@ footer {
     position: fixed;
     bottom: 7rem;
     right: 2rem;
-    z-index: 998;
+    z-index: 1000;
     width: 370px;
     height: 500px;
-    max-height: 540px;
+    max-height: 85vh;
     display: flex;
     flex-direction: column;
     border-radius: 16px;
