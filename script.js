@@ -22,29 +22,50 @@ document.addEventListener("DOMContentLoaded", () => {
     const API_URL = "https://api-chatbot-municipal.onrender.com/chat";
 
     // Función para abrir/cerrar el chat
-    function toggleChat() {
+    function abrirChat() {
         const contenedor = document.querySelector(".chatbot-contenedor");
-        chatWindow.classList.toggle("abierto");
+        chatWindow.classList.add("abierto");
+        if (contenedor) contenedor.classList.add("chat-abierto");
+        if (chatInput) setTimeout(() => chatInput.focus(), 150);
+    }
+
+    function cerrarChat(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        chatWindow.classList.remove("abierto");
+        const contenedor = document.querySelector(".chatbot-contenedor");
+        if (contenedor) contenedor.classList.remove("chat-abierto");
+    }
+
+    function toggleChat(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         if (chatWindow.classList.contains("abierto")) {
-            contenedor.classList.add("chat-abierto");
-            chatInput.focus();
+            cerrarChat(e);
         } else {
-            contenedor.classList.remove("chat-abierto");
+            abrirChat();
         }
     }
 
     // 1. Toggle al hacer clic en la mascota
-    chatToggle.addEventListener("click", toggleChat);
+    if (chatToggle) {
+        chatToggle.addEventListener("click", toggleChat);
+    }
 
-    // Botón cerrar (X) dentro del chat
+    // Botón cerrar (X) dentro del chat con soporte touch y click
     if (chatCerrar) {
-        chatCerrar.addEventListener("click", toggleChat);
+        chatCerrar.addEventListener("click", cerrarChat);
+        chatCerrar.addEventListener("touchend", cerrarChat, { passive: false });
     }
 
     // Cerrar con Escape
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && chatWindow.classList.contains("abierto")) {
-            toggleChat();
+            cerrarChat(e);
         }
     });
 
