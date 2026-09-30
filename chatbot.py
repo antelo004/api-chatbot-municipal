@@ -221,12 +221,43 @@ def buscar_duckduckgo(query: str) -> str:
     return ""
 
 
+def limpiar_query_busqueda(mensaje: str) -> str:
+    """Elimina prefijos conversacionales para que Wikipedia y DuckDuckGo encuentren el tema exacto."""
+    q = mensaje.strip()
+    q = re.sub(r'[¿?¡!]', '', q).strip()
+    
+    patrones_prefijo = [
+        r'^(?:dame|muestrame|muestra|pasa|pasame|escribe|escribeme|canta|cantame)\s+(?:la\s+)?(?:letra\s+(?:de|del)\s+)?',
+        r'^(?:cual\s+es|cuál\s+es|como\s+es|cómo\s+es)\s+(?:la\s+)?(?:letra\s+(?:de|del)\s+)?',
+        r'^(?:quiero\s+saber|quisiera\s+saber|me\s+gustaria\s+saber|puedes\s+decirme|podrias\s+decirme|dime|cuentame\s+de|cuéntame\s+sobre|hablame\s+de|háblame\s+de)\s+',
+        r'^(?:que\s+es|qué\s+es|quien\s+es|quién\s+es|donde\s+queda|dónde\s+queda|donde\s+esta|dónde\s+está)\s+',
+    ]
+    for pat in patrones_prefijo:
+        m = re.match(pat, q, re.IGNORECASE)
+        if m:
+            resto = q[m.end():].strip()
+            if len(resto) >= 3:
+                q = resto
+            break
+            
+    if any(w in mensaje.lower() for w in ["letra", "estrofa"]) and "letra" not in q.lower():
+        q = f"letra {q}"
+    elif any(w in mensaje.lower() for w in ["himno"]) and "himno" not in q.lower():
+        q = f"himno {q}"
+
+    return q.strip()
+
+
 def buscar_en_internet(query: str) -> str:
     """Combina Wikipedia y DuckDuckGo para obtener contexto rico y verificado."""
     partes = []
     
-    # 1. Búsqueda enciclopédica
+    # 1. Búsqueda enciclopédica (con query limpia)
     info_wiki = buscar_wikipedia(query)
+    if not info_wiki and "letra " in query.lower():
+        # Reintentar sin 'letra ' para que Wikipedia localice el artículo principal
+        info_wiki = buscar_wikipedia(query.lower().replace("letra ", "").strip())
+        
     if info_wiki:
         partes.append(info_wiki)
         
@@ -305,14 +336,14 @@ def obtener_respuesta_asistente(mensaje_usuario: str, idioma: str = 'es', primer
     # BÚSQUEDA WEB EN TIEMPO REAL si corresponde
     contexto_web = ""
     if debe_buscar_en_web(mensaje_usuario):
-        query_busqueda = mensaje_usuario
+        query_busqueda = limpiar_query_busqueda(mensaje_usuario)
         # Si preguntan por clima o tiempo sin especificar lugar, añadir Riberalta Beni
         if any(p in msg_min for p in ["clima", "tiempo", "temperatura", "lluvia", "llueve", "weather"]):
             if "riberalta" not in msg_min and "bolivia" not in msg_min and "guayaramerin" not in msg_min:
-                query_busqueda = f"{mensaje_usuario} Riberalta Beni Bolivia"
+                query_busqueda = f"{query_busqueda} Riberalta Beni Bolivia"
         # Si preguntan por Cachuela Esperanza, enfocar en Beni Bolivia
         elif "cachuela" in msg_min and "bolivia" not in msg_min:
-            query_busqueda = f"{mensaje_usuario} Cachuela Esperanza Beni Bolivia"
+            query_busqueda = f"{query_busqueda} Cachuela Esperanza Beni Bolivia"
             
         contexto_web = buscar_en_internet(query_busqueda)
 
