@@ -70,6 +70,42 @@ HECHOS_RIBERALTA_Y_REGION = """
 - Famosa por albergar una isla flotante cubierta de palmeras y exuberante vegetación en su centro.
 - Destino turístico favorito para paseos en bote, pesca deportiva, avistamiento de aves amazónicas, baño y leyendas tradicionales (como la del Jichi y el Bufeo).
 
+5. SÍMBOLOS Y LETRAS OFICIALES EXACTAS (NUNCA INVENTAR OTRAS):
+- HIMNO NACIONAL DE BOLIVIA (Letra: José Ignacio de Sanjinés | Música: Leopoldo Benedetto Vincenti):
+  Estrofa I:
+  Bolivianos: el hado propicio
+  coronó nuestros votos y anhelo;
+  es ya libre, ya libre este suelo,
+  ya cesó su servil condición.
+  Estrofa II:
+  Al estruendo marcial que ayer fuera
+  y al clamor de la guerra horroroso,
+  siguen hoy, en contraste armonioso,
+  dulces himnos de paz y de unión.
+  Coro:
+  De la patria el alto nombre
+  en glorioso esplendor conservemos,
+  y en sus aras de nuevo juremos:
+  ¡Morir antes que esclavos vivir!
+
+- HIMNO AL BENI (Letra: Alfredo Pereyra Lanza | Música: Rafael Saavedra):
+  Canta victorioso
+  pueblo de leyenda,
+  tu himno de paz y libertad;
+  cante el porvenir
+  la patria amada
+  en tu suelo fecundo y oriental.
+  En tus selvas milenarias
+  el progreso cantará,
+  y en tus ríos majestuosos
+  el futuro brillará.
+
+- HIMNO A RIBERALTA (Letra: Pedro Shimose | Música: Teófilo Vargas):
+  ¡Salve, oh perla del norte boliviano!
+  Tierra hermosa de sol y de progreso,
+  donde el Beni y la Madre de Dios se unen
+  en abrazo de amor y de grandeza.
+
 === FIN DE DATOS VERIFICADOS ===
 """
 
@@ -79,7 +115,7 @@ HECHOS_RIBERALTA_Y_REGION = """
 # ══════════════════════════════════════════════════════════════
 
 def buscar_wikipedia(query: str) -> str:
-    """Busca resúmenes enciclopédicos en Wikipedia en español."""
+    """Busca resúmenes enciclopédicos o secciones específicas en Wikipedia en español."""
     try:
         url_search = f"https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&utf8=&format=json"
         req = urllib.request.Request(
@@ -93,6 +129,37 @@ def buscar_wikipedia(query: str) -> str:
                 return ""
             
             titulo = results[0]["title"]
+
+            # Si el usuario busca letra, himno, poema, canción o texto íntegro, extraer la sección correspondiente
+            query_lower = query.lower()
+            if any(p in query_lower for p in ["letra", "himno", "poema", "cancion", "canción", "estrofa", "texto"]):
+                try:
+                    url_sec = f"https://es.wikipedia.org/w/api.php?action=parse&page={urllib.parse.quote(titulo)}&redirects=1&prop=sections&format=json"
+                    req_sec = urllib.request.Request(url_sec, headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"})
+                    with urllib.request.urlopen(req_sec, timeout=3.5) as res_sec:
+                        data_sec = json.loads(res_sec.read().decode("utf-8"))
+                        sections = data_sec.get("parse", {}).get("sections", [])
+                        sec_target = None
+                        for s in sections:
+                            line_lower = s.get("line", "").lower()
+                            if "letra" in line_lower or "texto" in line_lower:
+                                sec_target = s.get("index")
+                                if any(term in line_lower for term in ["presente", "oficial", "actual"]):
+                                    break
+                        if sec_target:
+                            url_text = f"https://es.wikipedia.org/w/api.php?action=parse&page={urllib.parse.quote(titulo)}&redirects=1&prop=text&section={sec_target}&format=json"
+                            req_text = urllib.request.Request(url_text, headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"})
+                            with urllib.request.urlopen(req_text, timeout=3.5) as res_text:
+                                data_text = json.loads(res_text.read().decode("utf-8"))
+                                html = data_text.get("parse", {}).get("text", {}).get("*", "")
+                                clean = re.sub(r"<[^>]+>", "\n", html)
+                                clean = "\n".join(l.strip() for l in clean.splitlines() if l.strip())
+                                if clean:
+                                    return f"📖 Enciclopedia ({titulo} - Sección Letra/Texto Oficial):\n{clean[:2500]}"
+                except Exception as e_sec:
+                    print(f"[DEBUG] Error extrayendo sección Wikipedia: {e_sec}")
+
+            # Resumen estándar
             titulo_clean = urllib.parse.quote(titulo.replace(" ", "_"))
             url_summary = f"https://es.wikipedia.org/api/rest_v1/page/summary/{titulo_clean}"
             req_sum = urllib.request.Request(
@@ -276,9 +343,16 @@ CONOCIMIENTO OFICIAL DE LA REGIÓN (USA SIEMPRE ESTOS DATOS):
 {HECHOS_RIBERALTA_Y_REGION}
 
 INSTRUCCIONES CLAVE DE RESPUESTA:
-1. LUGARES Y TURISMO REGIONAL: Si te preguntan sobre Cachuela Esperanza, Guayaramerín, la Laguna Tumichucua, la castaña o Riberalta, responde con gran detalle histórico y turístico, destacando que Cachuela Esperanza queda en el municipio de Guayaramerín (a unos 43 km de Guayaramerín y 90 km de Riberalta), su relación con el magnate del caucho Nicolás Suárez, sus imponentes rápidos y su arquitectura victoriana.
-2. ACCESO A INTERNET Y ACTUALIDAD: Cuentas con un motor de búsqueda web en tiempo real. Utiliza la información provista abajo para responder con total precisión, actualidad y rigor. NUNCA digas que no tienes acceso a internet o que no puedes saberlo si la información se encuentra en los resultados o en tus conocimientos.
-3. CONOCIMIENTOS GENERALES Y EDUCATIVOS: Además de turismo municipal, eres un tutor versátil: puedes explicar historia, ciencias, naturaleza amazónica, redactar textos o resolver dudas con entusiasmo.
+1. REGLA INQUEBRANTABLE: CERO ALUCINACIONES (100% PRECISIÓN FACTUAL):
+   - NUNCA inventes versos, estrofas, letras de canciones o himnos, citas de leyes, fechas ni datos biográficos.
+   - Si el usuario te pide un texto literal (como un himno o poema) o un dato específico y NO tienes el texto completo exacto verificado en tu contexto o búsqueda web:
+     * NUNCA inventes versos, rimas ni estrofas para "rellenar".
+     * Entrega con total fidelidad las partes que sí están verificadas y advierte con transparencia: "No dispongo de la letra completa verificada en mis registros para evitar inexactitudes".
+   - Si no tienes un dato con absoluta certeza, di con franqueza: "No tengo esa información exacta verificada".
+   - Prioriza siempre la precisión técnica, histórica y factual por encima de sonar complaciente o creativo.
+2. LUGARES Y TURISMO REGIONAL: Si te preguntan sobre Cachuela Esperanza, Guayaramerín, la Laguna Tumichucua, la castaña o Riberalta, responde con gran detalle histórico y turístico, destacando que Cachuela Esperanza queda en el municipio de Guayaramerín (a unos 43 km de Guayaramerín y 90 km de Riberalta), su relación con el magnate del caucho Nicolás Suárez, sus imponentes rápidos y su arquitectura victoriana.
+3. ACCESO A INTERNET Y ACTUALIDAD: Cuentas con un motor de búsqueda web en tiempo real. Utiliza la información provista abajo para responder con total precisión, actualidad y rigor. NUNCA digas que no tienes acceso a internet si dispones de resultados web.
+4. CONOCIMIENTOS GENERALES Y EDUCATIVOS: Además de turismo municipal, eres un tutor versátil: puedes explicar historia, ciencias, naturaleza amazónica o resolver dudas con rigor y claridad.
 """
 
     if contexto_web:
@@ -288,14 +362,14 @@ INSTRUCCIONES CLAVE DE RESPUESTA:
 INFORMACIÓN OBTENIDA DE INTERNET EN TIEMPO REAL:
 {contexto_web}
 ══════════════════════════════════════════════════════
-Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma verídica y actualizada.
+Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma estrictamente verídica y actualizada.
 """
 
-    # Modelos activos y comprobados en la cuenta
+    # Modelos activos y comprobados en la cuenta (temperatura 0.0 para cero alucinaciones)
     MODELOS_GROQ = [
         "qwen/qwen3.8-27b",
-        "openai/gpt-oss-20b",
-        "llama-3.1-8b-instant"
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b"
     ]
 
     ultimo_error = None
@@ -303,7 +377,7 @@ Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma ve
         try:
             response = client.chat.completions.create(
                 model=modelo,
-                temperature=0.3,
+                temperature=0.0,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": mensaje_usuario}
