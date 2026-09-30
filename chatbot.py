@@ -319,6 +319,9 @@ Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma ve
         import traceback
         with open("error.log", "w", encoding="utf-8") as f:
             f.write(traceback.format_exc())
+        print(f"[FATAL] Todos los modelos fallaron. Último error: {ultimo_error}")
+        if os.getenv("FLASK_ENV") == "development" or os.getenv("DEBUG_LLM") == "true":
+            return f"[DEBUG ERROR]: {ultimo_error}"
 
     if idioma == 'en':
         return "I'm having a brief connection issue. Please try again in a moment."
@@ -331,6 +334,33 @@ Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma ve
 # ══════════════════════════════════════════════════════════════
 # 6. ENDPOINTS DE LA API
 # ══════════════════════════════════════════════════════════════
+
+@app.route("/debug-llm", methods=["GET"])
+def debug_llm():
+    """Diagnóstico directo de los modelos de Groq."""
+    resultados = {}
+    modelos_a_probar = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "qwen/qwen3.8-27b",
+        "gemma2-9b-it",
+        "mixtral-8x7b-32768"
+    ]
+    for m in modelos_a_probar:
+        try:
+            r = client.chat.completions.create(
+                model=m,
+                messages=[{"role": "user", "content": "Di 'hola'"}],
+                max_tokens=15
+            )
+            resultados[m] = {"ok": True, "respuesta": r.choices[0].message.content.strip()}
+        except Exception as e:
+            resultados[m] = {"ok": False, "error": str(e)}
+    return jsonify({
+        "has_api_key": bool(os.getenv("GROQ_API_KEY")),
+        "api_key_len": len(os.getenv("GROQ_API_KEY") or ""),
+        "modelos": resultados
+    })
 
 @app.route("/chat", methods=["POST"])
 @limiter.limit("40 per minute")
