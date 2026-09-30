@@ -291,11 +291,11 @@ INFORMACIÓN OBTENIDA DE INTERNET EN TIEMPO REAL:
 Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma verídica y actualizada.
 """
 
-    # Modelos de Groq (priorizando llama-3.3-70b-versatile por su alta capacidad de razonamiento)
+    # Modelos activos y comprobados en la cuenta
     MODELOS_GROQ = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768"
+        "qwen/qwen3.8-27b",
+        "openai/gpt-oss-20b",
+        "llama-3.1-8b-instant"
     ]
 
     ultimo_error = None
@@ -338,13 +338,17 @@ Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma ve
 @app.route("/debug-llm", methods=["GET"])
 def debug_llm():
     """Diagnóstico directo de los modelos de Groq."""
+    modelos_disponibles = []
+    try:
+        modelos_disponibles = [m.id for m in client.models.list().data]
+    except Exception as e:
+        modelos_disponibles = [f"Error listing: {e}"]
+
     resultados = {}
     modelos_a_probar = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
         "qwen/qwen3.8-27b",
-        "gemma2-9b-it",
-        "mixtral-8x7b-32768"
+        "openai/gpt-oss-20b",
+        "llama-3.1-8b-instant"
     ]
     for m in modelos_a_probar:
         try:
@@ -358,8 +362,8 @@ def debug_llm():
             resultados[m] = {"ok": False, "error": str(e)}
     return jsonify({
         "has_api_key": bool(os.getenv("GROQ_API_KEY")),
-        "api_key_len": len(os.getenv("GROQ_API_KEY") or ""),
-        "modelos": resultados
+        "modelos_disponibles_en_cuenta": modelos_disponibles,
+        "pruebas": resultados
     })
 
 @app.route("/chat", methods=["POST"])
