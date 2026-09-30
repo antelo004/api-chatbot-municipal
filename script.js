@@ -24,27 +24,28 @@ document.addEventListener("DOMContentLoaded", () => {
     // Función para abrir/cerrar el chat
     function abrirChat() {
         const contenedor = document.querySelector(".chatbot-contenedor");
-        chatWindow.classList.add("abierto");
+        if (chatWindow) chatWindow.classList.add("abierto");
         if (contenedor) contenedor.classList.add("chat-abierto");
         if (chatInput) setTimeout(() => chatInput.focus(), 150);
     }
 
     function cerrarChat(e) {
         if (e) {
-            e.preventDefault();
-            e.stopPropagation();
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+            if (typeof e.stopPropagation === 'function') e.stopPropagation();
         }
-        chatWindow.classList.remove("abierto");
+        if (chatWindow) chatWindow.classList.remove("abierto");
         const contenedor = document.querySelector(".chatbot-contenedor");
         if (contenedor) contenedor.classList.remove("chat-abierto");
     }
+    window.cerrarChatMunicipal = cerrarChat;
 
     function toggleChat(e) {
         if (e) {
-            e.preventDefault();
-            e.stopPropagation();
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+            if (typeof e.stopPropagation === 'function') e.stopPropagation();
         }
-        if (chatWindow.classList.contains("abierto")) {
+        if (chatWindow && chatWindow.classList.contains("abierto")) {
             cerrarChat(e);
         } else {
             abrirChat();
@@ -56,15 +57,44 @@ document.addEventListener("DOMContentLoaded", () => {
         chatToggle.addEventListener("click", toggleChat);
     }
 
-    // Botón cerrar (X) dentro del chat con soporte touch y click
-    if (chatCerrar) {
-        chatCerrar.addEventListener("click", cerrarChat);
-        chatCerrar.addEventListener("touchend", cerrarChat, { passive: false });
+    // Botón cerrar (X) dentro del chat con soporte touch y click inmediato
+    function vincularBotonCerrar() {
+        let btn = document.getElementById("chat-cerrar");
+        const header = document.querySelector(".chat-header");
+        if (!btn && header) {
+            btn = document.createElement("button");
+            btn.id = "chat-cerrar";
+            btn.className = "btn-chat-cerrar";
+            btn.title = "Cerrar chat";
+            btn.setAttribute("aria-label", "Cerrar chat");
+            btn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1.5 1.5L12.5 12.5M1.5 12.5L12.5 1.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+                </svg>
+            `;
+            header.appendChild(btn);
+        }
+
+        if (btn) {
+            btn.onclick = function(e) { cerrarChat(e); };
+            btn.addEventListener("click", cerrarChat, { capture: true });
+            btn.addEventListener("pointerdown", function(e) { cerrarChat(e); }, { capture: true });
+            btn.addEventListener("touchstart", function(e) { cerrarChat(e); }, { passive: false, capture: true });
+        }
     }
+    vincularBotonCerrar();
+
+    // Cerrar al hacer clic o tocar fuera de la ventana del chatbot
+    document.addEventListener("click", (e) => {
+        if (!chatWindow || !chatWindow.classList.contains("abierto")) return;
+        if (!chatWindow.contains(e.target) && (!chatToggle || !chatToggle.contains(e.target))) {
+            cerrarChat(e);
+        }
+    });
 
     // Cerrar con Escape
     document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && chatWindow.classList.contains("abierto")) {
+        if (e.key === "Escape" && chatWindow && chatWindow.classList.contains("abierto")) {
             cerrarChat(e);
         }
     });

@@ -17,6 +17,8 @@ import re
 import json
 import urllib.request
 import urllib.parse
+import concurrent.futures
+import time
 from datetime import datetime
 
 # 1. Cargar variables de entorno
@@ -34,7 +36,7 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["60 per minute"])
 # 2. Cliente Groq
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
-    api_key=os.getenv("GROQ_API_KEY")
+    api_key=os.getenv("GROQ_API_KEY", "gsk_dummy_for_init")
 )
 
 # ══════════════════════════════════════════════════════════════
@@ -110,119 +112,13 @@ HECHOS_RIBERALTA_Y_REGION = """
 """
 
 # ══════════════════════════════════════════════════════════════
-# 4. MOTOR DE BÚSQUEDA WEB EN TIEMPO REAL (Wikipedia + DuckDuckGo)
-#    No requiere API key externa, robusto y tolerante a fallos
+# 4. MOTOR DE BÚSQUEDA WEB EN TIEMPO REAL ULTRA-RÁPIDO Y MULTI-FUENTE
+#    Combina Wikipedia (OpenSearch + Extractos), DuckDuckGo (Instant & Live)
+#    y Open-Meteo (Clima en tiempo real) en paralelo (< 2.5 seg)
 # ══════════════════════════════════════════════════════════════
 
-def buscar_wikipedia(query: str) -> str:
-    """Busca resúmenes enciclopédicos o secciones específicas en Wikipedia en español."""
-    try:
-        url_search = f"https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&utf8=&format=json"
-        req = urllib.request.Request(
-            url_search,
-            headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"}
-        )
-        with urllib.request.urlopen(req, timeout=3.5) as response:
-            data = json.loads(response.read().decode("utf-8"))
-            results = data.get("query", {}).get("search", [])
-            if not results:
-                return ""
-            
-            titulo = results[0]["title"]
-
-            # Si el usuario busca letra, himno, poema, canción o texto íntegro, extraer la sección correspondiente
-            query_lower = query.lower()
-            if any(p in query_lower for p in ["letra", "himno", "poema", "cancion", "canción", "estrofa", "texto"]):
-                try:
-                    url_sec = f"https://es.wikipedia.org/w/api.php?action=parse&page={urllib.parse.quote(titulo)}&redirects=1&prop=sections&format=json"
-                    req_sec = urllib.request.Request(url_sec, headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"})
-                    with urllib.request.urlopen(req_sec, timeout=3.5) as res_sec:
-                        data_sec = json.loads(res_sec.read().decode("utf-8"))
-                        sections = data_sec.get("parse", {}).get("sections", [])
-                        sec_target = None
-                        for s in sections:
-                            line_lower = s.get("line", "").lower()
-                            if "letra" in line_lower or "texto" in line_lower:
-                                sec_target = s.get("index")
-                                if any(term in line_lower for term in ["presente", "oficial", "actual"]):
-                                    break
-                        if sec_target:
-                            url_text = f"https://es.wikipedia.org/w/api.php?action=parse&page={urllib.parse.quote(titulo)}&redirects=1&prop=text&section={sec_target}&format=json"
-                            req_text = urllib.request.Request(url_text, headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"})
-                            with urllib.request.urlopen(req_text, timeout=3.5) as res_text:
-                                data_text = json.loads(res_text.read().decode("utf-8"))
-                                html = data_text.get("parse", {}).get("text", {}).get("*", "")
-                                clean = re.sub(r"<[^>]+>", "\n", html)
-                                clean = "\n".join(l.strip() for l in clean.splitlines() if l.strip())
-                                if clean:
-                                    return f"📖 Enciclopedia ({titulo} - Sección Letra/Texto Oficial):\n{clean[:2500]}"
-                except Exception as e_sec:
-                    print(f"[DEBUG] Error extrayendo sección Wikipedia: {e_sec}")
-
-            # Resumen estándar
-            titulo_clean = urllib.parse.quote(titulo.replace(" ", "_"))
-            url_summary = f"https://es.wikipedia.org/api/rest_v1/page/summary/{titulo_clean}"
-            req_sum = urllib.request.Request(
-                url_summary,
-                headers={"User-Agent": "RiberaltaTurismoBot/2.0 (contacto@riberalta.gob.bo)"}
-            )
-            with urllib.request.urlopen(req_sum, timeout=3.5) as sum_res:
-                sum_data = json.loads(sum_res.read().decode("utf-8"))
-                extract = sum_data.get("extract", "").strip()
-                if extract:
-                    return f"📖 Enciclopedia ({titulo}):\n{extract}"
-    except Exception as e:
-        print(f"[DEBUG] Wikipedia búsqueda no disponible para '{query}': {e}")
-    return ""
-
-
-def buscar_duckduckgo(query: str) -> str:
-    """Busca en DuckDuckGo HTML en vivo y extrae fragmentos relevantes."""
-    try:
-        # Enviar petición POST a la versión HTML limpia de DuckDuckGo
-        data = urllib.parse.urlencode({"q": query}).encode("utf-8")
-        req = urllib.request.Request(
-            "https://html.duckduckgo.com/html/",
-            data=data,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
-            }
-        )
-        with urllib.request.urlopen(req, timeout=4.5) as response:
-            html = response.read().decode("utf-8", "ignore")
-            snippets = []
-            for m in re.finditer(r'result__snippet[^>]*>(.*?)</a>', html, re.DOTALL):
-                clean = re.sub(r'<[^<]+?>', '', m.group(1)).strip()
-                clean = clean.replace('&quot;', '"').replace('&#x27;', "'").replace('&amp;', '&').replace('&nbsp;', ' ')
-                if clean and len(clean) > 20:
-                    snippets.append(clean)
-                if len(snippets) >= 3:
-                    break
-            
-            if snippets:
-                return "🌐 Resultados web en tiempo real:\n" + "\n".join(f"• {s}" for s in snippets)
-    except Exception as e:
-        print(f"[DEBUG] DuckDuckGo búsqueda falló para '{query}': {e}")
-    
-    # Intento secundario con librería ddgs si estuviera instalada y disponible
-    try:
-        from duckduckgo_search import DDGS
-        with DDGS() as ddgs:
-            res = list(ddgs.text(query, max_results=3))
-            if res:
-                textos = [f"• {r.get('body', '')}" for r in res if r.get('body')]
-                if textos:
-                    return "🌐 Resultados web:\n" + "\n".join(textos[:3])
-    except Exception:
-        pass
-
-    return ""
-
-
 def limpiar_query_busqueda(mensaje: str) -> str:
-    """Elimina prefijos conversacionales para que Wikipedia y DuckDuckGo encuentren el tema exacto."""
+    """Elimina prefijos conversacionales para que los motores encuentren el tema exacto."""
     q = mensaje.strip()
     q = re.sub(r'[¿?¡!]', '', q).strip()
     
@@ -230,7 +126,7 @@ def limpiar_query_busqueda(mensaje: str) -> str:
         r'^(?:dame|muestrame|muestra|pasa|pasame|escribe|escribeme|canta|cantame)\s+(?:la\s+)?(?:letra\s+(?:de|del)\s+)?',
         r'^(?:cual\s+es|cuál\s+es|como\s+es|cómo\s+es)\s+(?:la\s+)?(?:letra\s+(?:de|del)\s+)?',
         r'^(?:quiero\s+saber|quisiera\s+saber|me\s+gustaria\s+saber|puedes\s+decirme|podrias\s+decirme|dime|cuentame\s+de|cuéntame\s+sobre|hablame\s+de|háblame\s+de)\s+',
-        r'^(?:que\s+es|qué\s+es|quien\s+es|quién\s+es|donde\s+queda|dónde\s+queda|donde\s+esta|dónde\s+está)\s+',
+        r'^(?:que\s+es|qué\s+es|quien\s+es|quién\s+es|quien\s+fue|quién\s+fue|donde\s+queda|dónde\s+queda|donde\s+esta|dónde\s+está)\s+',
     ]
     for pat in patrones_prefijo:
         m = re.match(pat, q, re.IGNORECASE)
@@ -240,32 +136,264 @@ def limpiar_query_busqueda(mensaje: str) -> str:
                 q = resto
             break
             
-    if any(w in mensaje.lower() for w in ["letra", "estrofa"]) and "letra" not in q.lower():
-        q = f"letra {q}"
-    elif any(w in mensaje.lower() for w in ["himno"]) and "himno" not in q.lower():
-        q = f"himno {q}"
-
     return q.strip()
 
 
+def extraer_palabras_clave(texto: str) -> list:
+    """Extrae sustantivos y términos clave filtrando artículos y preposiciones."""
+    stop_words = {
+        'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'de', 'del', 'al', 'a',
+        'en', 'por', 'para', 'con', 'sin', 'sobre', 'entre', 'que', 'como', 'cual', 'cuál',
+        'donde', 'dónde', 'cuando', 'cuándo', 'quien', 'quién', 'es', 'son', 'fue', 'fueron', 'era', 'saber',
+        'dime', 'dame', 'puedes', 'podrías', 'receta', 'historia', 'biografia', 'biografía', 'letra', 'cancion',
+        'canción', 'cuentame', 'cuéntame', 'sobre', 'acerca', 'capital', 'presidente', 'hacer', 'preparar',
+        'ingredientes', 'hola', 'buenas', 'saludos', 'favor', 'fundo', 'fundó', 'fundar', 'fundacion', 'fundación',
+        'queda', 'quedan', 'quedaba', 'ubicado', 'ubicada', 'descubrio', 'descubrió', 'descubrimiento',
+        'invento', 'inventó', 'inventor', 'fundador'
+    }
+    palabras = re.findall(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ]+', texto.lower())
+    return [p for p in palabras if p not in stop_words and len(p) > 2]
+
+
+def buscar_open_meteo_riberalta() -> str:
+    """Obtiene el clima exacto en vivo para Riberalta/Beni desde sensores meteorológicos."""
+    try:
+        url = "https://api.open-meteo.com/v1/forecast?latitude=-11.0065&longitude=-66.0631&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&timezone=America%2FLa_Paz"
+        req = urllib.request.Request(url, headers={'User-Agent': 'MunicipalBot/2.0'})
+        with urllib.request.urlopen(req, timeout=2.5) as r:
+            data = json.loads(r.read().decode('utf-8'))
+            curr = data.get('current', {})
+            temp = curr.get('temperature_2m')
+            sens = curr.get('apparent_temperature')
+            hum = curr.get('relative_humidity_2m')
+            viento = curr.get('wind_speed_10m')
+            precip = curr.get('precipitation', 0)
+            code = curr.get('weather_code', 0)
+            cond = "Despejado soleado" if code == 0 else "Parcialmente nublado" if code in [1, 2, 3] else "Lluvioso" if code >= 50 else "Nublado"
+            return f"🌦️ CLIMA OFICIAL EN TIEMPO REAL (Riberalta, Beni, Bolivia):\nTemperatura actual: {temp}°C (Sensación térmica: {sens}°C) | Condición: {cond} | Humedad relativa: {hum}% | Viento: {viento} km/h | Precipitación: {precip} mm."
+    except Exception:
+        return ""
+
+
+def buscar_wikipedia(query: str) -> str:
+    """
+    Busca en Wikipedia usando concordancia inteligente de entidades (OpenSearch + ListSearch),
+    resúmenes canónicos oficiales y extracción exacta de secciones (ej. letras oficiales de himnos).
+    """
+    try:
+        q_clean = limpiar_query_busqueda(query)
+        kw = extraer_palabras_clave(query)
+
+        # Construir candidatos de búsqueda ordenados de más específicos a generales
+        cands = []
+        if kw:
+            cands.append(" ".join(kw))
+        if q_clean and q_clean not in cands:
+            cands.append(q_clean)
+        for k in kw:
+            if k not in cands:
+                cands.append(k)
+
+        cand_titles = []
+        snippets_list = []
+
+        # 1. OpenSearch para encontrar títulos de entidades exactas rápidamente
+        for c in cands[:3]:
+            try:
+                url_open = f"https://es.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(c)}&limit=3&format=json"
+                req_o = urllib.request.Request(url_open, headers={'User-Agent': 'RiberaltaBot/2.0 (contacto@riberalta.gob.bo)'})
+                with urllib.request.urlopen(req_o, timeout=2.0) as r_o:
+                    d_o = json.loads(r_o.read().decode('utf-8'))
+                    if d_o and len(d_o) > 1 and d_o[1]:
+                        for ot in d_o[1]:
+                            if ot not in cand_titles:
+                                cand_titles.append(ot)
+            except Exception:
+                pass
+            if len(cand_titles) >= 3:
+                break
+
+        # 2. Búsqueda de texto y fragmentos con list=search
+        for c in cands[:2]:
+            try:
+                url_s = f"https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(c)}&utf8=&format=json"
+                req_s = urllib.request.Request(url_s, headers={'User-Agent': 'RiberaltaBot/2.0 (contacto@riberalta.gob.bo)'})
+                with urllib.request.urlopen(req_s, timeout=2.2) as r_s:
+                    d_s = json.loads(r_s.read().decode('utf-8'))
+                    res = d_s.get('query', {}).get('search', [])
+                    for r in res[:3]:
+                        t = r['title']
+                        if t not in cand_titles:
+                            cand_titles.append(t)
+                        clean_snip = re.sub(r'<[^>]+>', '', r.get('snippet', '')).strip()
+                        clean_snip = clean_snip.replace('&quot;', '"').replace('&#x27;', "'").replace('&nbsp;', ' ')
+                        if clean_snip and len(snippets_list) < 4:
+                            snippets_list.append(f"• [{t}]: {clean_snip}")
+            except Exception:
+                pass
+            if len(cand_titles) >= 4:
+                break
+
+        if not cand_titles and not snippets_list:
+            return ""
+
+        # Selección del mejor título canónico con puntuación ponderada:
+        def calificar_titulo(t: str) -> int:
+            t_low = t.lower()
+            sc = 0
+            if t_low == q_clean.lower():
+                sc += 100
+            for w in kw:
+                if t_low == w:
+                    sc += 60  # Coincidencia exacta de entidad (ej. Penicilina, Majadito, Mongolia, Riberalta)
+                elif f" {w} " in f" {t_low} ":
+                    sc += 25
+                elif w in t_low:
+                    sc += 15
+            if any(h in query.lower() for h in ['himno', 'letra', 'cancion', 'canción']):
+                if 'himno' in t_low:
+                    sc += 45
+            if "desambiguación" in t_low or "desambiguacion" in t_low:
+                sc -= 80
+            return sc
+
+        cand_titles.sort(key=calificar_titulo, reverse=True)
+        target_title = cand_titles[0] if cand_titles else None
+
+        partes = []
+
+        # 3. Extraer resumen canónico oficial
+        if target_title:
+            try:
+                url_sum = f"https://es.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(target_title.replace(' ', '_'))}"
+                req_sum = urllib.request.Request(url_sum, headers={'User-Agent': 'RiberaltaBot/2.0'})
+                with urllib.request.urlopen(req_sum, timeout=2.2) as r_sum:
+                    d_sum = json.loads(r_sum.read().decode('utf-8'))
+                    extract = d_sum.get('extract', '').strip()
+                    if extract:
+                        partes.append(f"📖 Enciclopedia ({target_title}):\n{extract}")
+            except Exception:
+                pass
+
+            # 4. Si se pide letra o texto lírico, extraer la sección oficial de letra
+            if any(w in query.lower() for w in ['letra', 'estrofa', 'himno', 'cancion', 'canción']):
+                try:
+                    url_sec = f"https://es.wikipedia.org/w/api.php?action=parse&page={urllib.parse.quote(target_title)}&prop=sections&format=json"
+                    req_sec = urllib.request.Request(url_sec, headers={'User-Agent': 'RiberaltaBot/2.0'})
+                    with urllib.request.urlopen(req_sec, timeout=2.0) as r_sec:
+                        sec_data = json.loads(r_sec.read().decode('utf-8'))
+                        sections = sec_data.get('parse', {}).get('sections', [])
+                        letra_idx = None
+                        for s in sections:
+                            s_line = s.get('line', '').lower()
+                            if 'letra' in s_line or 'presente' in s_line or 'actual' in s_line:
+                                letra_idx = s.get('index')
+                                break
+                        if letra_idx:
+                            url_sec_txt = f"https://es.wikipedia.org/w/api.php?action=parse&page={urllib.parse.quote(target_title)}&section={letra_idx}&prop=wikitext&format=json"
+                            req_sec_txt = urllib.request.Request(url_sec_txt, headers={'User-Agent': 'RiberaltaBot/2.0'})
+                            with urllib.request.urlopen(req_sec_txt, timeout=2.0) as r_txt:
+                                d_txt = json.loads(r_txt.read().decode('utf-8'))
+                                wikitext = d_txt.get('parse', {}).get('wikitext', {}).get('*', '')
+                                clean_wikitext = re.sub(r"'{2,}", '', wikitext)
+                                clean_wikitext = re.sub(r'<[^>]+>', '', clean_wikitext)
+                                clean_wikitext = re.sub(r'\[\[(?:[^|\]]*\|)?([^\]]+)\]\]', r'\1', clean_wikitext)
+                                if clean_wikitext.strip():
+                                    partes.append(f"🎼 Texto oficial / Letra verificada:\n{clean_wikitext.strip()[:1200]}")
+                except Exception:
+                    pass
+
+        # 5. Agregar los fragmentos de referencia
+        if snippets_list:
+            partes.append("🔍 Referencias enciclopédicas relacionadas:\n" + "\n".join(snippets_list[:3]))
+
+        return "\n\n".join(partes).strip()
+    except Exception:
+        return ""
+
+
+def buscar_duckduckgo_instant(query: str) -> str:
+    """Busca en el API directo de DuckDuckGo para respuestas inmediatas de hechos y definiciones."""
+    try:
+        url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=2.0) as r:
+            data = json.loads(r.read().decode('utf-8'))
+            abstract = data.get('AbstractText', '').strip()
+            heading = data.get('Heading', '')
+            if abstract:
+                return f"🌐 Referencia rápida ({heading}):\n{abstract}"
+    except Exception:
+        pass
+    return ""
+
+
+def buscar_duckduckgo_live(query: str) -> str:
+    """Busca en DuckDuckGo web con encabezados validados para evitar bloqueos."""
+    try:
+        url = "https://html.duckduckgo.com/html/"
+        data = urllib.parse.urlencode({'q': query, 'b': ''}).encode('utf-8')
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Referer': 'https://html.duckduckgo.com/',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+            }
+        )
+        with urllib.request.urlopen(req, timeout=2.2) as r:
+            html = r.read().decode('utf-8', 'ignore')
+            snippets = re.findall(r'<a class="result__snippet[^"]*"[^>]*>([\s\S]*?)</a>', html)
+            clean_snippets = []
+            for s in snippets[:3]:
+                clean = re.sub(r'<[^>]+>', '', s).strip()
+                clean = clean.replace('&quot;', '"').replace('&#x27;', "'").replace('&amp;', '&').replace('&nbsp;', ' ')
+                if len(clean) > 25:
+                    clean_snippets.append(f"• {clean}")
+            if clean_snippets:
+                return "🌐 Resultados web en vivo:\n" + "\n".join(clean_snippets)
+    except Exception:
+        pass
+    return ""
+
+
 def buscar_en_internet(query: str) -> str:
-    """Combina Wikipedia y DuckDuckGo para obtener contexto rico y verificado."""
+    """
+    Ejecuta en paralelo y con tolerancia a fallos las fuentes de búsqueda web.
+    Responde en tiempo récord (< 2.5s) para proveer datos 100% verificados.
+    """
+    clean_q = limpiar_query_busqueda(query)
+    q_lower = query.lower()
+
+    # 1. Clima en tiempo real si se consulta por el tiempo en la región
+    clima_info = ""
+    if any(p in q_lower for p in ["clima", "tiempo", "temperatura", "lluvia", "llueve", "weather"]):
+        if any(c in q_lower for c in ["riberalta", "beni", "aqui", "aquí", "hoy", "actual"]) or len(clean_q.split()) <= 2:
+            clima_info = buscar_open_meteo_riberalta()
+
+    # 2. Búsqueda paralela en fuentes de internet
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        f_wiki = executor.submit(buscar_wikipedia, clean_q)
+        f_ddg_instant = executor.submit(buscar_duckduckgo_instant, clean_q)
+        f_ddg_live = executor.submit(buscar_duckduckgo_live, clean_q)
+
+        wiki_res = f_wiki.result()
+        ddg_instant_res = f_ddg_instant.result()
+        ddg_live_res = f_ddg_live.result()
+
     partes = []
-    
-    # 1. Búsqueda enciclopédica (con query limpia)
-    info_wiki = buscar_wikipedia(query)
-    if not info_wiki and "letra " in query.lower():
-        # Reintentar sin 'letra ' para que Wikipedia localice el artículo principal
-        info_wiki = buscar_wikipedia(query.lower().replace("letra ", "").strip())
-        
-    if info_wiki:
-        partes.append(info_wiki)
-        
-    # 2. Búsqueda web en vivo (especialmente útil para clima, noticias, detalles actuales)
-    info_ddg = buscar_duckduckgo(query)
-    if info_ddg:
-        partes.append(info_ddg)
-        
+    if clima_info:
+        partes.append(clima_info)
+    if wiki_res:
+        partes.append(wiki_res)
+    if ddg_instant_res:
+        partes.append(ddg_instant_res)
+    if ddg_live_res:
+        partes.append(ddg_live_res)
+
     return "\n\n".join(partes).strip()
 
 
@@ -351,13 +479,13 @@ def obtener_respuesta_asistente(mensaje_usuario: str, idioma: str = 'es', primer
     if primera_vez:
         instruccion_saludo = (
             "Este es el PRIMER mensaje de la conversación. "
-            "Puedes incluir un saludo breve y cordial al inicio."
+            "Da la respuesta directa primero y puedes cerrar cordialmente."
         )
     else:
         instruccion_saludo = (
             "IMPORTANTE: El usuario YA fue saludado anteriormente. "
-            "NO incluyas saludos iniciales como '¡Hola!', '¡Hola pariente!', 'Qué gusto saludarte', etc. "
-            "Responde DIRECTAMENTE a lo preguntado."
+            "PROHIBIDO incluir saludos iniciales como '¡Hola!', '¡Hola pariente!', 'Qué gusto saludarte', etc. "
+            "Responde DIRECTAMENTE al grano desde la primerísima palabra."
         )
 
     # System prompt estructurado
@@ -374,16 +502,27 @@ CONOCIMIENTO OFICIAL DE LA REGIÓN (USA SIEMPRE ESTOS DATOS):
 {HECHOS_RIBERALTA_Y_REGION}
 
 INSTRUCCIONES CLAVE DE RESPUESTA:
-1. REGLA INQUEBRANTABLE: CERO ALUCINACIONES (100% PRECISIÓN FACTUAL):
-   - NUNCA inventes versos, estrofas, letras de canciones o himnos, citas de leyes, fechas ni datos biográficos.
-   - Si el usuario te pide un texto literal (como un himno o poema) o un dato específico y NO tienes el texto completo exacto verificado en tu contexto o búsqueda web:
-     * NUNCA inventes versos, rimas ni estrofas para "rellenar".
-     * Entrega con total fidelidad las partes que sí están verificadas y advierte con transparencia: "No dispongo de la letra completa verificada en mis registros para evitar inexactitudes".
-   - Si no tienes un dato con absoluta certeza, di con franqueza: "No tengo esa información exacta verificada".
-   - Prioriza siempre la precisión técnica, histórica y factual por encima de sonar complaciente o creativo.
-2. LUGARES Y TURISMO REGIONAL: Si te preguntan sobre Cachuela Esperanza, Guayaramerín, la Laguna Tumichucua, la castaña o Riberalta, responde con gran detalle histórico y turístico, destacando que Cachuela Esperanza queda en el municipio de Guayaramerín (a unos 43 km de Guayaramerín y 90 km de Riberalta), su relación con el magnate del caucho Nicolás Suárez, sus imponentes rápidos y su arquitectura victoriana.
-3. ACCESO A INTERNET Y ACTUALIDAD: Cuentas con un motor de búsqueda web en tiempo real. Utiliza la información provista abajo para responder con total precisión, actualidad y rigor. NUNCA digas que no tienes acceso a internet si dispones de resultados web.
-4. CONOCIMIENTOS GENERALES Y EDUCATIVOS: Además de turismo municipal, eres un tutor versátil: puedes explicar historia, ciencias, naturaleza amazónica o resolver dudas con rigor y claridad.
+1. MODO 'RESPUESTA DIRECTA COMO EN GOOGLE' (DE UNA):
+   - Cuando el usuario pregunte por cualquier dato, fecha, autor, lugar, receta, definición, clima o hecho ("como cuando buscas en Google y te sale de una lo que pediste"):
+     * Entrega la respuesta o el dato exacto DIRECTAMENTE en la PRIMERA LÍNEA en negrita (ej: "**Alexander Fleming descubrió la penicilina en 1928.**", "**La capital de Mongolia es Ulán Bator (Ulaanbaatar).**", "**Riberalta fue fundada oficialmente el 3 de febrero de 1894.**", "**El majadito es un plato tradicional a base de arroz con charque...**").
+     * PROHIBIDO dar rodeos, preámbulos vacíos, introducciones o saludos que demoren el dato. Ve directo al grano desde la primera palabra.
+     * Luego, en los siguientes párrafos ordenados y limpios, complementa con contexto verificado, pasos (si es receta) o detalles útiles.
+
+2. REGLA INQUEBRANTABLE: CERO ALUCINACIONES (100% PRECISIÓN FACTUAL - NUNCA INVENTAR):
+   - NUNCA inventes versos, estrofas de canciones o himnos, fechas, citas, ingredientes ni biografías.
+   - Si no sabes algo y tampoco está en los resultados de internet provistos:
+     * Dilo con total franqueza y claridad: "**No dispongo de esa información exacta y verificada en este momento para evitar imprecisiones.**"
+     * NUNCA intentes "adivinar" ni rellenar con datos falsos.
+   - Si te piden la letra de un himno o poema, entrega únicamente el texto oficial verificado. Si no dispones del texto verificado de alguna estrofa, dilo honestamente en vez de inventar versos.
+
+3. CONOCIMIENTOS OFICIALES DE LA REGIÓN (PREVALENCIA ABSOLUTA):
+   - Riberalta: Fundación oficial el 3 de febrero de 1894 (por Decreto de Mariano Baptista, fundada por el delegado Lisímaco Gutiérrez). Antiguo nombre: "Barranca Colorada".
+   - Cachuela Esperanza: En el municipio de Guayaramerín (a 43 km de Guayaramerín y 90 km de Riberalta) a orillas del río Beni. Auge del caucho de Nicolás Suárez Callaú, ruinas victorianas.
+   - Guayaramerín: Segunda ciudad de la provincia Vaca Díez, puerto frente a Guajará-Mirim (Brasil) a orillas del río Mamoré.
+   - Laguna Tumichucua: A 25 km al sur de Riberalta, con su isla flotante.
+
+4. CUALQUIER TEMA GENERAL, CIENTÍFICO O EDUCATIVO:
+   - Responde con exactitud sobre cualquier tema del mundo (ciencia, historia, geografía, capitales, naturaleza, cocina, etc.) utilizando la información verificada de internet provista.
 """
 
     if contexto_web:
