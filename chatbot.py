@@ -26,9 +26,23 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# CORS abierto para desarrollo y sitios autorizados
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
-CORS(app, origins=allowed_origins)
+# Configuración defensiva de CORS: Restricción a dominios oficiales y desarrollo local
+raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+if raw_origins == "*":
+    CORS(app, resources={r"/*": {"origins": "*"}})
+elif raw_origins:
+    allowed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
+    CORS(app, resources={r"/*": {"origins": allowed_origins}})
+else:
+    # Dominios de confianza autorizados (Netlify, Render, Dominio Municipal, Localhost)
+    trusted_patterns = [
+        re.compile(r"^https:\/\/.*\.netlify\.app$"),
+        re.compile(r"^https:\/\/.*\.onrender\.com$"),
+        re.compile(r"^https:\/\/.*\.riberalta\.gob\.bo$"),
+        re.compile(r"^http:\/\/localhost(:\d+)?$"),
+        re.compile(r"^http:\/\/127\.0\.0\.1(:\d+)?$")
+    ]
+    CORS(app, resources={r"/*": {"origins": trusted_patterns}})
 
 # Rate limiting: 60 peticiones por minuto por IP
 limiter = Limiter(get_remote_address, app=app, default_limits=["60 per minute"])
@@ -580,8 +594,19 @@ Utiliza estos datos obtenidos de la web para enriquecer tu respuesta de forma es
 # ══════════════════════════════════════════════════════════════
 
 @app.route("/debug-llm", methods=["GET"])
+@limiter.limit("10 per minute")
 def debug_llm():
-    """Diagnóstico directo de los modelos de Groq."""
+    """Diagnóstico directo de los modelos de Groq (protegido por clave de administración)."""
+    admin_key = os.getenv("ADMIN_DEBUG_KEY")
+    req_key = request.headers.get("X-Admin-Key") or request.args.get("key")
+    
+    # Si no se configuró ADMIN_DEBUG_KEY o la clave no coincide, denegar acceso
+    if not admin_key or req_key != admin_key:
+        return jsonify({
+            "error": "Acceso no autorizado",
+            "mensaje": "Endpoint de diagnóstico administrativo restringido. Proporcione la clave mediante el encabezado 'X-Admin-Key' o el parámetro '?key='."
+        }), 403
+
     modelos_disponibles = []
     try:
         modelos_disponibles = [m.id for m in client.models.list().data]
@@ -629,6 +654,7 @@ def chat():
 
 
 @app.route("/test-search", methods=["GET"])
+@limiter.limit("15 per minute")
 def test_search_endpoint():
     """Endpoint público para verificar que la búsqueda en internet funciona activamente."""
     q = request.args.get("q", "Cachuela Esperanza Bolivia").strip()
