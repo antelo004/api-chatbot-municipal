@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     // Despertar silenciosamente la instancia de Render al cargar la página
     try {
-        fetch("https://api-chatbot-municipal.onrender.com/", { mode: 'no-cors' }).catch(() => {});
+        fetch("https://api-chatbot-municipal.onrender.com/").catch(() => {});
     } catch(e) {}
 
     const chatToggle = document.getElementById("chatbot-toggle");
@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Despertar también al pasar el mouse sobre el botón
     if (chatToggle) {
         chatToggle.addEventListener("mouseenter", () => {
-            try { fetch("https://api-chatbot-municipal.onrender.com/", { mode: 'no-cors' }).catch(() => {}); } catch(e) {}
+            try { fetch("https://api-chatbot-municipal.onrender.com/").catch(() => {}); } catch(e) {}
         }, { once: true });
     }
 

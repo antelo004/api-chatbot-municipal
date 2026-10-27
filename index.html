@@ -10,13 +10,13 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800;900;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1791436235086">
-    <link rel="stylesheet" href="../login-widget.css?v=1791436235086">
+    <link rel="stylesheet" href="styles.css?v=1792630064372">
+    <link rel="stylesheet" href="../login-widget.css?v=1792630064372">
 </head>
 
 <body class="cargando">
     <div id="pantalla-carga">
-        <video autoplay loop muted playsinline>
+        <video autoplay loop muted playsinline webkit-playsinline>
             <source src="jaguar2.mp4" type="video/mp4">
         </video>
         <div class="capa-oscura"></div>
@@ -37,7 +37,7 @@
                 <span>Gobierno Municipal</span>
             </div>
         </div>
-        
+
         <ul class="nav-links">
             <li><a href="#inicio">Inicio</a></li>
             <li><a href="#historia">Nuestra Historia</a></li>
@@ -53,7 +53,7 @@
     </nav>
 
     <section id="inicio" class="hero">
-        <video autoplay loop muted playsinline>
+        <video autoplay loop muted playsinline webkit-playsinline>
             <source src="libelula2.mp4" type="video/mp4">
         </video>
         <div class="hero-blocker"></div>
@@ -210,7 +210,7 @@
     <div class="chatbot-contenedor">
         <div class="chatbot-saludo">¡Ey! 👋</div>
         <button id="chatbot-toggle" title="Abrir chat">
-            <video id="libelulin-video-toggle" autoplay loop muted playsinline>
+            <video id="libelulin-video-toggle" autoplay loop muted playsinline webkit-playsinline>
                 <source src="libelulin 12.mp4" type="video/mp4">
             </video>
         </button>
@@ -219,7 +219,7 @@
     <div id="chatbot-window" role="dialog" aria-label="Asistente virtual municipal">
         <div class="chat-header">
             <div class="chat-header-icon">
-                <video id="libelulin-video" autoplay loop muted playsinline>
+                <video id="libelulin-video" autoplay loop muted playsinline webkit-playsinline>
                     <source src="libelulin 12.mp4" type="video/mp4">
                 </video>
             </div>
@@ -229,7 +229,8 @@
             </div>
             <button id="chat-cerrar" class="btn-chat-cerrar" title="Cerrar chat" aria-label="Cerrar chat">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1.5 1.5L12.5 12.5M1.5 12.5L12.5 1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <path d="M1.5 1.5L12.5 12.5M1.5 12.5L12.5 1.5" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" />
                 </svg>
             </button>
         </div>
@@ -259,12 +260,13 @@
         </div>
     </div>
 
-    <script src="script.js?v=1791436235086"></script>
+    <script src="script.js?v=1792630064372"></script>
 
     <!-- ═══ LOGIN MODAL (global) ═══ -->
     <div class="login-modal-overlay" id="loginModal">
         <div class="login-modal-content">
-            <button type="button" class="close-modal" id="closeLoginModal" onclick="document.getElementById('loginModal').classList.remove('open');">&#x2715;</button>
+            <button type="button" class="close-modal" id="closeLoginModal"
+                onclick="document.getElementById('loginModal').classList.remove('open');">&#x2715;</button>
             <div class="login-header">
                 <h3>Iniciar Sesión</h3>
                 <p>Accede a tu cuenta municipal</p>
@@ -280,7 +282,9 @@
                         <input type="password" id="loginPass" required placeholder="••••••••">
                     </div>
                     <button type="submit" class="btn-orange-solid">Entrar</button>
-                    <p class="switch-form">¿No tienes cuenta? <a href="#" onclick="document.getElementById('formLogin').classList.remove('active');document.getElementById('formRegister').classList.add('active');return false;">Regístrate aquí</a></p>
+                    <p class="switch-form">¿No tienes cuenta? <a href="#"
+                            onclick="document.getElementById('formLogin').classList.remove('active');document.getElementById('formRegister').classList.add('active');return false;">Regístrate
+                            aquí</a></p>
                 </form>
             </div>
             <div class="form-container" id="formRegister">
@@ -298,31 +302,34 @@
                         <input type="password" id="regPass" required placeholder="••••••••">
                     </div>
                     <button type="submit" class="btn-orange-solid">Crear Cuenta</button>
-                    <p class="switch-form">¿Ya tienes cuenta? <a href="#" onclick="document.getElementById('formRegister').classList.remove('active');document.getElementById('formLogin').classList.add('active');return false;">Inicia Sesión</a></p>
+                    <p class="switch-form">¿Ya tienes cuenta? <a href="#"
+                            onclick="document.getElementById('formRegister').classList.remove('active');document.getElementById('formLogin').classList.add('active');return false;">Inicia
+                            Sesión</a></p>
                 </form>
             </div>
         </div>
     </div>
 
-    
-    
-    
+
+
+
     <!-- ═══ USER STATUS WIDGET ═══ -->
     <div class="user-status-widget" id="userStatusWidget">
         <div class="usw-tooltip" id="userStatusTooltip">
             <div class="usw-tooltip-inner">
                 <div class="usw-tooltip-avatar"></div>
                 <div class="usw-tooltip-text">
-                    <span class="usw-tooltip-title" id="userStatusText" data-i18n="comer_no_sesion">Iniciar sesión</span>
-                    
+                    <span class="usw-tooltip-title" id="userStatusText" data-i18n="comer_no_sesion">Iniciar
+                        sesión</span>
+
                 </div>
                 <button class="usw-tooltip-btn" id="userStatusActionBtn" aria-label="Ir al login">&#8594;</button>
             </div>
         </div>
         <button id="qhLogoutBtn" style="display:none;" data-i18n="comer_salir">Salir</button>
     </div>
-    <script type="module" src="../auth-service.js?v=1791436235086"></script>
-    <script src="../animacion.js?v=1791436235086"></script>
+    <script type="module" src="../auth-service.js?v=1792630064372"></script>
+    <script src="../animacion.js?v=1792630064372"></script>
 </body>
 
 </html>
