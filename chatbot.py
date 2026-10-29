@@ -37,13 +37,15 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=0, x_prefix=0)
 def _get_default_trusted_origins() -> list:
     """Lista blanca estricta de orígenes autorizados para CORS."""
     origins = [
-        "https://turismo-riberalt-gamr.netlify.app",
-        "https://administracioncentralg-a-m-r08278-2.netlify.app",
-        "https://admincalendario08357-l21p-pkdee.netlify.app",
+        "https://riberaltaturismo-gob-go.netlify.app",
+        "https://admincentrasl-983-kjfh-3512.netlify.app",
+        "https://admincalendario-09-kjbv-5376.netlify.app",
+        "https://guiaturistica-1f7f1.firebaseapp.com",
+        "https://guiaturistica-1f7f1.web.app",
         "https://riberalta.gob.bo",
         "https://www.riberalta.gob.bo",
         re.compile(
-            r"^https:\/\/[a-f0-9]{24}--(turismo-riberalt-gamr|administracioncentralg-a-m-r08278-2|admincalendario08357-l21p-pkdee)\.netlify\.app$"
+            r"^https:\/\/[a-f0-9]{24}--(riberaltaturismo-gob-go|admincentrasl-983-kjfh-3512|admincalendario-09-kjbv-5376)\.netlify\.app$"
         ),
         re.compile(r"^https:\/\/[a-zA-Z0-9-]+\.riberalta\.gob\.bo$"),
     ]
